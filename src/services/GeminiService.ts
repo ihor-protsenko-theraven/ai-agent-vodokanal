@@ -36,7 +36,7 @@ Output strictly valid JSON matching this schema:
   "requiresTicketRegistration": true/false (true if emergency leak/damage/accident requiring a repair crew; false if general pricing info or tariffs inquiry),
   "ticket": {
     "appealType": "One of: Витік холодної води, Порив водопроводу, Відсутнє водопостачання, Пошкодження/відсутність люка, Засмічення каналізації, Консультація / Тарифи, Другое",
-    "ticketType": "One of: Аварійна, Планова, Інформаційна, Другое",
+    "ticketType": "One of: Аварійна, Планова, Інформаційна, Інше",
     "applicantName": "Full name if spoken",
     "applicantAddress": "Residential address if spoken",
     "addressText": "Location of incident/accident",
