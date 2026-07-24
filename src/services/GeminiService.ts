@@ -27,31 +27,42 @@ export class GeminiService {
 
     const systemPrompt = `
 You are an AI Water Utility Dispatcher for Водоканал (WSN).
-Analyze the incoming voice call audio and extract structured data.
+Analyze the incoming voice call audio (if provided) and the text transcript.
+Your task is to dynamically parse the applicant's spoken text into a structured JSON ticket.
+
+CRITICAL INSTRUCTIONS:
+1. "appealType": Choose ONE strictly from: "Витік холодної води", "Порив водопроводу", "Відсутнє водопостачання", "Пошкодження/відсутність люка", "Засмічення каналізації", "Консультація / Тарифи", "Інше".
+2. "ticketType": Choose ONE strictly from: "Аварійна", "Планова", "Інформаційна". If it's a consultation, use "Інформаційна".
+3. "requiresTicketRegistration": true for leaks/damages/accidents; false for general pricing/tariffs inquiries.
+4. "addressText": Extract the EXACT incident address. If the location is vague (e.g. "не знаю", "десь на Борщагівці", "біля бару"), indicate the vague location and set "addressExtraction" confidence below 0.70 so it requires manual review. If no city is mentioned, assume "м. Київ". Format as "м. Київ, вул. [Street], [House]". If it's a consultation without an address, output "Консультація (без виїзду бригади)".
+5. "phoneNumber": Extract any spoken phone number and format it as +380XXXXXXXXX.
+6. "applicantName": Extract the caller's name if they introduce themselves (e.g., "це Марія", "мене звати Сергій"). If not mentioned, output "Громадянин (із голосового звернення)".
+7. "transcript": Reconstruct a realistic dialog using the EXACT spoken text provided. For example: "[00:01] AI-Агент: Доброго дня! Водоканал. Опишіть проблему.\\n[00:04] Заявник: \\"THE EXACT SPOKEN TEXT\\"\\n[00:10] AI-Агент: Прийнято."
+8. "notes": Write a brief summary of the incident starting with "Диспетчер AI: " followed by the spoken problem.
 
 Output strictly valid JSON matching this schema:
 {
   "callId": "CALL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}",
-  "transcript": "[00:01] AI-Агент: ...\\n[00:05] Заявник: ...",
-  "requiresTicketRegistration": true/false (true if emergency leak/damage/accident requiring a repair crew; false if general pricing info or tariffs inquiry),
+  "transcript": "formatted dialog with exact applicant text",
+  "requiresTicketRegistration": boolean,
   "ticket": {
-    "appealType": "One of: Витік холодної води, Порив водопроводу, Відсутнє водопостачання, Пошкодження/відсутність люка, Засмічення каналізації, Консультація / Тарифи, Другое",
-    "ticketType": "One of: Аварійна, Планова, Інформаційна, Інше",
-    "applicantName": "Full name if spoken",
-    "applicantAddress": "Residential address if spoken",
-    "addressText": "Location of incident/accident",
-    "coordinates": "lat, lng coordinates if spoken or empty string",
-    "phoneNumber": "Phone number if mentioned or +380...",
+    "appealType": "string",
+    "ticketType": "string",
+    "applicantName": "string",
+    "applicantAddress": "same as addressText",
+    "addressText": "string",
+    "coordinates": "lat, lng or empty string",
+    "phoneNumber": "string or empty",
     "incidentDateTime": "${new Date().toISOString().slice(0, 16)}",
-    "notes": "Concise detailed description of problem"
+    "notes": "string"
   },
   "confidence": {
-    "speechRecognition": number between 0.0 and 1.0,
-    "classification": number between 0.0 and 1.0,
-    "addressExtraction": number between 0.0 and 1.0,
-    "geocoding": number between 0.0 and 1.0
+    "speechRecognition": 0.95,
+    "classification": 0.95,
+    "addressExtraction": 0.95,
+    "geocoding": 0.0
   },
-  "requiresManualReview": boolean (true if any confidence score < ${CONFIG.CONFIDENCE_THRESHOLD}),
+  "requiresManualReview": true,
   "suggestedQuestions": ["Question 1?", "Question 2?"]
 }
 `;
@@ -63,47 +74,85 @@ Output strictly valid JSON matching this schema:
 
     let response: Response | null = null;
 
-    for (const modelName of candidateModels) {
-      try {
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
-        const res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: systemPrompt },
-                  {
-                    inlineData: {
-                      mimeType: mimeType,
-                      data: base64Audio
-                    }
-                  }
-                ]
+    // Stage 1: Try Gemini Multimodal API (Audio + Spoken Text)
+    if (CONFIG.GEMINI_API_KEY) {
+      for (const modelName of candidateModels) {
+        try {
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
+          const res = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: systemPrompt },
+                    ...(spokenText && spokenText.trim().length > 0 ? [{ text: `Spoken Text Transcript: "${spokenText}"` }] : []),
+                    ...(base64Audio && base64Audio.length > 50 ? [{
+                      inlineData: {
+                        mimeType: mimeType,
+                        data: base64Audio
+                      }
+                    }] : [])
+                  ]
+                }
+              ],
+              generationConfig: {
+                responseMimeType: 'application/json',
+                temperature: CONFIG.GEMINI_TEMPERATURE
               }
-            ],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.1
-            }
-          })
-        });
+            })
+          });
 
-        if (res.ok) {
-          response = res;
-          break;
-        } else {
-          console.warn(`Gemini model ${modelName} returned status ${res.status}`);
+          if (res.ok) {
+            response = res;
+            break;
+          } else {
+            console.warn(`Gemini model ${modelName} returned status ${res.status}`);
+          }
+        } catch (e) {
+          console.warn(`Fetch error for Gemini model ${modelName}:`, e);
         }
-      } catch (e) {
-        console.warn(`Fetch error for Gemini model ${modelName}:`, e);
+      }
+
+      // Stage 2: Text-only fallback to Gemini API if audio payload failed
+      if ((!response || !response.ok) && spokenText && spokenText.trim().length > 0) {
+        for (const modelName of candidateModels) {
+          try {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${CONFIG.GEMINI_API_KEY}`;
+            const res = await fetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      { text: systemPrompt },
+                      { text: `Analyze spoken Ukrainian call transcript: "${spokenText}"` }
+                    ]
+                  }
+                ],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  temperature: CONFIG.GEMINI_TEMPERATURE
+                }
+              })
+            });
+
+            if (res.ok) {
+              response = res;
+              break;
+            }
+          } catch (e) {
+            console.warn(`Text-only Gemini fetch error for ${modelName}:`, e);
+          }
+        }
       }
     }
 
-    // If Gemini API is rate-limited (429) or all models fail, parse exact spoken text or fall back
+    // Stage 3: Offline High-Precision NLP Fallback via VoiceDictationService
     if (!response || !response.ok) {
-      console.info('Gemini API quota reached or unavailable. Activating dynamic voice dictation processor.');
+      console.info('Gemini API unavailable or unconfigured. Executing high-precision offline NLP parser.');
       if (spokenText && spokenText.trim().length > 0) {
         return await VoiceDictationService.getInstance().parseSpokenText(spokenText);
       }
@@ -114,13 +163,20 @@ Output strictly valid JSON matching this schema:
     const rawJson = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!rawJson) {
+      if (spokenText && spokenText.trim().length > 0) {
+        return await VoiceDictationService.getInstance().parseSpokenText(spokenText);
+      }
       return this.getOfflineFallbackResult();
     }
 
     let parsedResult: AgentProcessingResult;
     try {
-      parsedResult = JSON.parse(rawJson);
+      const cleanJson = rawJson.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsedResult = JSON.parse(cleanJson);
     } catch {
+      if (spokenText && spokenText.trim().length > 0) {
+        return await VoiceDictationService.getInstance().parseSpokenText(spokenText);
+      }
       return this.getOfflineFallbackResult();
     }
 
@@ -165,7 +221,7 @@ Output strictly valid JSON matching this schema:
    */
   private async geocodeAddress(addressStr: string): Promise<string | null> {
     try {
-      const query = encodeURIComponent(`${addressStr}, ${CONFIG.GEOCODING.DEFAULT_CITY_SUFFIX}`);
+      const query = encodeURIComponent(`${addressStr}, ${CONFIG.GEOCODING.DEFAULT_COUNTRY_SUFFIX}`);
       const url = `${CONFIG.GEOCODING.NOMINATIM_BASE_URL}?q=${query}&format=json&limit=1`;
       const res = await fetch(url, {
         headers: {

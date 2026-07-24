@@ -47,17 +47,17 @@ export class TicketDispatcherUI {
 
   private buildWorkspaceBaseLayout(): void {
     this.rootContainer.innerHTML = `
-      <div class="min-h-screen flex flex-col bg-slate-900 text-slate-100 font-sans lg:h-screen lg:overflow-hidden">
+      <div class="min-h-screen flex flex-col bg-slate-900 text-slate-100 font-sans">
         <!-- Header Root -->
         <div id="header-root"></div>
 
-        <!-- Main Workspace (50/50 Split Screen Layout on large screens, stacked on small) -->
-        <main class="flex-1 grid grid-cols-1 lg:grid-cols-2 overflow-y-auto lg:overflow-hidden">
+        <!-- Main Workspace (50/50 Split Screen Layout) -->
+        <main class="flex-1 flex flex-col lg:grid lg:grid-cols-2 overflow-y-auto lg:overflow-hidden lg:h-[calc(100vh-65px)]">
           <!-- Left 50%: Transcript & AI Prompts -->
-          <section id="transcript-root" class="min-h-[500px] lg:h-full"></section>
+          <section id="transcript-root" class="w-full h-auto lg:h-full lg:overflow-hidden relative border-b lg:border-b-0 lg:border-r border-slate-800"></section>
 
           <!-- Right 50%: Ticket Creation Form -->
-          <section id="form-root" class="min-h-[500px] lg:h-full"></section>
+          <section id="form-root" class="w-full h-auto lg:h-full lg:overflow-hidden relative"></section>
         </main>
 
         <!-- Modals & Overlay Roots -->

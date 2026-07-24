@@ -43,5 +43,5 @@
 }
 
 .low-confidence-badge {
-  @apply bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1;
+  @apply bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9px] sm:text-[10px] md:text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1;
 }
