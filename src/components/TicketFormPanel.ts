@@ -27,27 +27,27 @@ export class TicketFormPanelComponent {
       <div class="h-auto lg:h-full flex flex-col bg-slate-900 lg:overflow-hidden">
         <!-- Panel Header & Confidence Scores Overview -->
         <div class="p-4 bg-slate-950/80 border-b border-slate-800 flex flex-col gap-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-start sm:items-center gap-2 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 mt-0.5 sm:mt-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
               </div>
-              <div>
-                <h2 class="text-sm font-bold text-white">Картка формування заявки WSN</h2>
-                <p class="text-xs text-slate-400">Класифікація WSN 27994 / Обліковий запис WSN-SERVICE</p>
+              <div class="min-w-0">
+                <h2 class="text-sm font-bold text-white truncate">Картка формування заявки WSN</h2>
+                <p class="text-[10px] sm:text-xs text-slate-400 truncate">Класифікація WSN 27994 / Обліковий запис WSN-SERVICE</p>
               </div>
             </div>
 
             <!-- Manual Review Status Pill -->
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 shrink-0">
               ${result.requiresManualReview ? `
-                <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-pulse">
+                <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5 animate-pulse">
                   ⚠️ Ручна перевірка
                 </span>
               ` : `
-                <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-lg flex items-center gap-1.5">
                   ✓ Автоматично прийнято
                 </span>
               `}
@@ -55,30 +55,30 @@ export class TicketFormPanelComponent {
           </div>
 
           <!-- Confidence Metrics Bar -->
-          <div class="grid grid-cols-4 gap-2 text-xs">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-1">
             <div class="bg-slate-900 p-2 rounded-lg border ${confidence.speechRecognition < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
-              <span class="text-slate-400 block text-[10px]">Розпізнавання</span>
+              <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Розпізнавання</span>
               <span class="font-bold ${confidence.speechRecognition < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.speechRecognition * 100).toFixed(0)}%
               </span>
             </div>
 
             <div class="bg-slate-900 p-2 rounded-lg border ${confidence.classification < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
-              <span class="text-slate-400 block text-[10px]">Класифікація</span>
+              <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Класифікація</span>
               <span class="font-bold ${confidence.classification < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.classification * 100).toFixed(0)}%
               </span>
             </div>
 
             <div class="bg-slate-900 p-2 rounded-lg border ${confidence.addressExtraction < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
-              <span class="text-slate-400 block text-[10px]">Адреса</span>
+              <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Адреса</span>
               <span class="font-bold ${confidence.addressExtraction < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.addressExtraction * 100).toFixed(0)}%
               </span>
             </div>
 
             <div class="bg-slate-900 p-2 rounded-lg border ${confidence.geocoding < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
-              <span class="text-slate-400 block text-[10px]">Геокодування</span>
+              <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Геокодування</span>
               <span class="font-bold ${confidence.geocoding < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.geocoding * 100).toFixed(0)}%
               </span>
@@ -350,17 +350,17 @@ export class TicketFormPanelComponent {
 
         <!-- Mandatory Verification Checkbox for Low Confidence Fields (Requirement 3) -->
         ${isLowConfidence ? `
-          <div class="pt-1 flex items-center justify-between text-xs border-t border-amber-500/20 mt-1">
-            <label class="flex items-center gap-2 cursor-pointer select-none text-amber-300 font-medium">
-              <input type="checkbox" data-verify="${opts.fieldKey}" ${isVerified ? 'checked' : ''} class="checkbox-verify w-4 h-4 rounded text-amber-500 bg-slate-900 border-amber-500 focus:ring-amber-500 cursor-pointer"/>
+          <div class="pt-1 flex items-center justify-between border-t border-amber-500/20 mt-1">
+            <label class="flex items-center gap-1.5 cursor-pointer select-none text-amber-300 font-medium text-[10px] leading-tight">
+              <input type="checkbox" data-verify="${opts.fieldKey}" ${isVerified ? 'checked' : ''} class="checkbox-verify w-3.5 h-3.5 rounded text-amber-500 bg-slate-900 border-amber-500 focus:ring-amber-500 cursor-pointer"/>
               <span>Підтвердити правильність даних</span>
             </label>
             ${isVerified ? `
-              <span class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+              <span class="text-[9px] text-emerald-400 font-semibold flex items-center gap-1">
                 ✓ Підтверджено
               </span>
             ` : `
-              <span class="text-[10px] text-amber-400 font-semibold">
+              <span class="text-[9px] text-amber-400 font-semibold">
                 Потрібен чекбокс
               </span>
             `}

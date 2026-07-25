@@ -48,31 +48,31 @@ export class TranscriptPanelComponent {
 
         <!-- Audio Stream & Controls Header -->
         <div class="p-4 bg-slate-950/80 border-b border-slate-800 flex flex-col gap-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0 w-full sm:w-auto">
+              <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0 mt-0.5 sm:mt-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
                 </svg>
               </div>
-              <div>
-                <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                  Транскрипція розмови WSN
-                  <span class="text-[10px] text-slate-400 font-normal">00:32 / 01:45</span>
+              <div class="min-w-0 flex-1">
+                <h2 class="text-sm font-bold text-white flex flex-wrap items-baseline gap-x-2 leading-tight">
+                  <span class="truncate">Транскрипція розмови WSN</span>
+                  <span class="text-[10px] text-slate-400 font-normal whitespace-nowrap">00:32 / 01:45</span>
                 </h2>
-                <p class="text-xs text-slate-400">STT Модуль: ${CONFIG.APP.STT_ENGINE} / Точність: ${(result.confidence.speechRecognition * 100).toFixed(0)}%</p>
+                <p class="text-[10px] sm:text-xs text-slate-400 truncate">STT: ${CONFIG.APP.STT_ENGINE} / Точність: ${(result.confidence.speechRecognition * 100).toFixed(0)}%</p>
               </div>
             </div>
 
             <!-- Intercept Button -->
-            <button id="btn-intercept-call" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md ${isIntercepted
+            <button id="btn-intercept-call" class="w-full sm:w-auto px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 ${isIntercepted
         ? 'bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400/50'
         : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
       }">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1.001 1.001 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
               </svg>
-              ${isIntercepted ? 'Повернути AI-агенту' : 'Перехопити розмову'}
+              <span class="truncate">${isIntercepted ? 'Повернути AI-агенту' : 'Перехопити розмову'}</span>
             </button>
           </div>
 
