@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { FieldVerificationStatus, WsnTicketData } from '../types/ticket';
 import { escapeHtml } from '../utils/security';
-import { CONFIG } from '../config/constants';
+import { wsnConfig } from '../config';
 
 export class TicketFormPanelComponent {
   private store: TicketStateStore;
@@ -143,11 +143,11 @@ export class TicketFormPanelComponent {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- WSN Property 1958: Appeal Type -->
               ${this.renderFormField({
-                label: `Тип звернення (WSN ${CONFIG.WSN.PROPERTIES.APPEAL_TYPE})`,
+                label: `Тип звернення (WSN ${wsnConfig.PROPERTIES.APPEAL_TYPE})`,
                 fieldKey: 'appealType',
                 value: formData.appealType,
                 type: 'select',
-                options: [...CONFIG.OPTIONS.APPEAL_TYPES],
+                options: [...wsnConfig.OPTIONS.APPEAL_TYPES],
                 confidenceKey: 'classification',
                 confidenceScore: confidence.classification,
                 isRequired: false
@@ -155,11 +155,11 @@ export class TicketFormPanelComponent {
 
               <!-- WSN Property 1972: Ticket Type -->
               ${this.renderFormField({
-                label: `Тип заявки (WSN ${CONFIG.WSN.PROPERTIES.TICKET_TYPE})`,
+                label: `Тип заявки (WSN ${wsnConfig.PROPERTIES.TICKET_TYPE})`,
                 fieldKey: 'ticketType',
                 value: formData.ticketType,
                 type: 'select',
-                options: [...CONFIG.OPTIONS.TICKET_TYPES],
+                options: [...wsnConfig.OPTIONS.TICKET_TYPES],
                 confidenceKey: 'classification',
                 confidenceScore: confidence.classification,
                 isRequired: false

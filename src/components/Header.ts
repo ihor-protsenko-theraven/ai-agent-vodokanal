@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { MOCK_SCENARIOS } from '../mock/mockData';
 import { escapeHtml } from '../utils/security';
-import { CONFIG } from '../config/constants';
+import { appConfig, wsnConfig } from '../config';
 
 export class HeaderComponent {
   private store: TicketStateStore;
@@ -29,10 +29,10 @@ export class HeaderComponent {
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-              <h1 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-wide leading-tight">${CONFIG.APP.TITLE}</h1>
-              <span class="bg-sky-500/20 text-sky-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-sky-500/30 shrink-0">${CONFIG.APP.VERSION_LABEL}</span>
+              <h1 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-wide leading-tight">${appConfig.TITLE}</h1>
+              <span class="bg-sky-500/20 text-sky-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-sky-500/30 shrink-0">${appConfig.VERSION_LABEL}</span>
             </div>
-            <p class="text-[9px] sm:text-[10px] md:text-xs text-slate-400 truncate max-w-[160px] sm:max-w-[200px] md:max-w-none">${CONFIG.APP.SUBTITLE}</p>
+            <p class="text-[9px] sm:text-[10px] md:text-xs text-slate-400 truncate max-w-[160px] sm:max-w-[200px] md:max-w-none">${appConfig.SUBTITLE}</p>
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export class HeaderComponent {
           <div class="text-[10px] md:text-xs flex items-center gap-1.5 shrink-0">
             <span class="text-slate-400">Користувач:</span>
             <span class="font-semibold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30 truncate max-w-[200px] sm:max-w-none">
-              ${escapeHtml(currentUser?.displayName || CONFIG.WSN.OPERATOR_DISPLAY)}
+              ${escapeHtml(currentUser?.displayName || wsnConfig.OPERATOR_DISPLAY)}
             </span>
           </div>
         </div>

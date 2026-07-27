@@ -1,5 +1,5 @@
 import { AgentProcessingResult, ScenarioDefinition } from '../types/ticket';
-import { CONFIG } from '../config/constants';
+import { aiConfig } from '../config';
 
 /**
  * Сценарій 1: Чітко сформовано (Висока впевненість)
@@ -165,25 +165,25 @@ export const SCENARIO_NO_REGISTRATION: AgentProcessingResult = {
 
 export const MOCK_SCENARIOS: ScenarioDefinition[] = [
   {
-    id: CONFIG.SCENARIOS.HIGH_CONFIDENCE,
+    id: aiConfig.SCENARIOS.HIGH_CONFIDENCE,
     name: '1. Чітко сформовано (Висока впевненість)',
     description: 'Усі дані чіткі, впевненість > 95%. Готово до реєстрації в 1 клік.',
     data: SCENARIO_HIGH_CONFIDENCE
   },
   {
-    id: CONFIG.SCENARIOS.DUPLICATES_FOUND,
+    id: aiConfig.SCENARIOS.DUPLICATES_FOUND,
     name: '2. Виявлено дублювання у WSN',
     description: 'Знайдено існуючі активні заявки WSN Class 27772. Виводиться Alert-банер.',
     data: SCENARIO_DUPLICATE_FOUND
   },
   {
-    id: CONFIG.SCENARIOS.LOW_CONFIDENCE,
+    id: aiConfig.SCENARIOS.LOW_CONFIDENCE,
     name: '3. Потрібно уточнити та валідувати оператору',
     description: 'Адреса та геокодування < 0.7. Вимагає ручної валідації чекбоксами.',
     data: SCENARIO_LOW_CONFIDENCE
   },
   {
-    id: CONFIG.SCENARIOS.NO_REGISTRATION,
+    id: aiConfig.SCENARIOS.NO_REGISTRATION,
     name: '4. Не потребує реєстрації (Консультація)',
     description: 'requiresTicketRegistration === false. Заблокована форма з кнопкою примусового створення.',
     data: SCENARIO_NO_REGISTRATION

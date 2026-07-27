@@ -1,5 +1,5 @@
 import { AgentProcessingResult } from '../types/ticket';
-import { CONFIG } from '../config/constants';
+import { aiConfig, geoConfig, speechConfig, wsnConfig } from '../config';
 
 export class VoiceDictationService {
   private static instance: VoiceDictationService;
@@ -12,7 +12,7 @@ export class VoiceDictationService {
       this.recognition = new SpeechRecognition();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      this.recognition.lang = CONFIG.SPEECH.RECOGNITION_LANG;
+      this.recognition.lang = speechConfig.RECOGNITION_LANG;
 
       // Always accumulate full speech transcript from index 0 across all result chunks
       this.recognition.onresult = (event: any) => {
@@ -66,13 +66,13 @@ export class VoiceDictationService {
    * 4. Tariff Consultation / No Crew Registration (scenario4_tariff_consultation)
    */
   public async parseSpokenText(spokenText: string): Promise<AgentProcessingResult> {
-    const text = spokenText.trim() || CONFIG.SPEECH.DEFAULT_DICTATION_PROMPT;
+    const text = spokenText.trim() || speechConfig.DEFAULT_DICTATION_PROMPT;
     const lower = text.toLowerCase();
 
     // 1. Detect Appeal Type across all scenarios
-    let appealType: string = CONFIG.OPTIONS.APPEAL_TYPES[0]; // Default: 'Витік холодної води'
+    let appealType: string = wsnConfig.OPTIONS.APPEAL_TYPES[0]; // Default: 'Витік холодної води'
     if (lower.includes('люк') || lower.includes('кришк') || lower.includes('колодец') || lower.includes('колодязь') || lower.includes('яма')) {
-      appealType = CONFIG.OPTIONS.APPEAL_TYPES[3]; // 'Пошкодження/відсутність люка'
+      appealType = wsnConfig.OPTIONS.APPEAL_TYPES[3]; // 'Пошкодження/відсутність люка'
     } else if (
       lower.includes('порив') ||
       lower.includes('прорив') ||
@@ -82,18 +82,18 @@ export class VoiceDictationService {
       lower.includes('водопровод') ||
       lower.includes('підвал')
     ) {
-      appealType = CONFIG.OPTIONS.APPEAL_TYPES[1]; // 'Порив водопроводу'
+      appealType = wsnConfig.OPTIONS.APPEAL_TYPES[1]; // 'Порив водопроводу'
     } else if (lower.includes('каналізац') || lower.includes('засміч') || lower.includes('стоки') || lower.includes('забит')) {
-      appealType = CONFIG.OPTIONS.APPEAL_TYPES[4]; // 'Засмічення каналізації'
+      appealType = wsnConfig.OPTIONS.APPEAL_TYPES[4]; // 'Засмічення каналізації'
     } else if (lower.includes('немає води') || lower.includes('відсутня вода') || lower.includes('відключ')) {
-      appealType = CONFIG.OPTIONS.APPEAL_TYPES[2]; // 'Відсутнє водопостачання'
+      appealType = wsnConfig.OPTIONS.APPEAL_TYPES[2]; // 'Відсутнє водопостачання'
     } else if (lower.includes('тариф') || lower.includes('ціна') || lower.includes('оплат') || lower.includes('показн') || lower.includes('підкажіть') || lower.includes('водовідведення')) {
-      appealType = CONFIG.OPTIONS.APPEAL_TYPES[5]; // 'Консультація / Тарифи'
+      appealType = wsnConfig.OPTIONS.APPEAL_TYPES[5]; // 'Консультація / Тарифи'
     }
 
     // 2. Detect Ticket Type & Registration Requirement (Scenario 4: Tariff Consultation)
-    const isConsultation = appealType === CONFIG.OPTIONS.APPEAL_TYPES[5];
-    const ticketType = isConsultation ? CONFIG.OPTIONS.TICKET_TYPES[2] : CONFIG.OPTIONS.TICKET_TYPES[0];
+    const isConsultation = appealType === wsnConfig.OPTIONS.APPEAL_TYPES[5];
+    const ticketType = isConsultation ? wsnConfig.OPTIONS.TICKET_TYPES[2] : wsnConfig.OPTIONS.TICKET_TYPES[0];
     const requiresTicketRegistration = !isConsultation;
 
     // 3. High-Precision Phone Number Extraction
@@ -115,11 +115,11 @@ export class VoiceDictationService {
 
     // 6. Automated Geocoding via Nominatim API
     let coordinates = '';
-    if (addressText && !addressText.includes(CONFIG.SPEECH.FALLBACK_ADDRESS_SUFFIX) && !isVagueLocation) {
+    if (addressText && !addressText.includes(speechConfig.FALLBACK_ADDRESS_SUFFIX) && !isVagueLocation) {
       try {
-        const queryStr = encodeURIComponent(`${addressText}, ${CONFIG.GEOCODING.DEFAULT_COUNTRY_SUFFIX}`);
-        const res = await fetch(`${CONFIG.GEOCODING.NOMINATIM_BASE_URL}?q=${queryStr}&format=json&limit=1`, {
-          headers: { 'User-Agent': CONFIG.GEOCODING.USER_AGENT }
+        const queryStr = encodeURIComponent(`${addressText}, ${geoConfig.DEFAULT_COUNTRY_SUFFIX}`);
+        const res = await fetch(`${geoConfig.NOMINATIM_BASE_URL}?q=${queryStr}&format=json&limit=1`, {
+          headers: { 'User-Agent': geoConfig.USER_AGENT }
         });
         if (res.ok) {
           const items = await res.json();
@@ -128,12 +128,12 @@ export class VoiceDictationService {
           }
         }
       } catch {
-        coordinates = detectedCity === 'Вінниця' ? CONFIG.GEOCODING.VINNYTSIA_COORDINATES : CONFIG.GEOCODING.DEFAULT_COORDINATES;
+        coordinates = detectedCity === 'Вінниця' ? geoConfig.VINNYTSIA_COORDINATES : geoConfig.DEFAULT_COORDINATES;
       }
     }
 
     if (!coordinates) {
-      coordinates = detectedCity === 'Вінниця' ? CONFIG.GEOCODING.VINNYTSIA_COORDINATES : CONFIG.GEOCODING.DEFAULT_COORDINATES;
+      coordinates = detectedCity === 'Вінниця' ? geoConfig.VINNYTSIA_COORDINATES : geoConfig.DEFAULT_COORDINATES;
     }
 
     // 7. Calculate Confidence Scores & Manual Review Status (Scenario 3: Unclear Location -> Low Confidence)
@@ -141,33 +141,33 @@ export class VoiceDictationService {
     const addressConfidence = isVagueLocation
       ? 0.62
       : hasValidAddress
-      ? CONFIG.CONFIDENCE_SCORES.ADDRESS_FULL
+      ? aiConfig.CONFIDENCE_SCORES.ADDRESS_FULL
       : extractedAddress.hasStreet
-      ? CONFIG.CONFIDENCE_SCORES.ADDRESS_STREET_ONLY
-      : CONFIG.CONFIDENCE_SCORES.ADDRESS_LOW;
+      ? aiConfig.CONFIDENCE_SCORES.ADDRESS_STREET_ONLY
+      : aiConfig.CONFIDENCE_SCORES.ADDRESS_LOW;
 
     const geoConfidence = isVagueLocation
       ? 0.54
-      : coordinates && coordinates !== CONFIG.GEOCODING.DEFAULT_COORDINATES
-      ? CONFIG.CONFIDENCE_SCORES.GEOCODING_FULL
-      : CONFIG.CONFIDENCE_SCORES.GEOCODING_FALLBACK;
+      : coordinates && coordinates !== geoConfig.DEFAULT_COORDINATES
+      ? aiConfig.CONFIDENCE_SCORES.GEOCODING_FULL
+      : aiConfig.CONFIDENCE_SCORES.GEOCODING_FALLBACK;
 
     const speechConfidence = text.length > 15
-      ? CONFIG.CONFIDENCE_SCORES.SPEECH_DEFAULT
-      : CONFIG.CONFIDENCE_SCORES.SPEECH_SHORT;
+      ? aiConfig.CONFIDENCE_SCORES.SPEECH_DEFAULT
+      : aiConfig.CONFIDENCE_SCORES.SPEECH_SHORT;
 
-    const classificationConfidence = CONFIG.CONFIDENCE_SCORES.CLASSIFICATION_DEFAULT;
+    const classificationConfidence = aiConfig.CONFIDENCE_SCORES.CLASSIFICATION_DEFAULT;
 
     // Trigger manual review flag if address or geocoding confidence < 0.70 threshold
-    const requiresManualReview = addressConfidence < CONFIG.CONFIDENCE_THRESHOLD || geoConfidence < CONFIG.CONFIDENCE_THRESHOLD;
+    const requiresManualReview = addressConfidence < aiConfig.CONFIDENCE_THRESHOLD || geoConfidence < aiConfig.CONFIDENCE_THRESHOLD;
 
     // 8. Scenario 2: Automated Duplicate Ticket Detection (matching active tickets on Khreshchatyk / repeats)
     const duplicatesFound = (lower.includes('хрещатик') || lower.includes('телефонували') || lower.includes('повторно') || lower.includes('бригада так і не приїхала')) ? [
       {
-        ticketId: `WSN-${CONFIG.WSN.CLASS_ID}-${CONFIG.WSN.DEFAULT_STATUS_ID}-0912`,
+        ticketId: `WSN-${wsnConfig.CLASS_ID}-${wsnConfig.DEFAULT_STATUS_ID}-0912`,
         matchReason: 'ADDRESS_MATCH' as const,
         createdDate: new Date().toISOString().slice(0, 16).replace('T', ' '),
-        status: `${CONFIG.WSN.DEFAULT_STATUS_ID} (${CONFIG.WSN.DEFAULT_STATUS_NAME})`,
+        status: `${wsnConfig.DEFAULT_STATUS_ID} (${wsnConfig.DEFAULT_STATUS_NAME})`,
         addressText: addressText,
         appealType: appealType
       }
@@ -189,7 +189,7 @@ export class VoiceDictationService {
         coordinates: isConsultation ? '' : coordinates,
         phoneNumber,
         incidentDateTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
-        notes: `${CONFIG.SPEECH.NOTES_PREFIX}${text}`
+        notes: `${speechConfig.NOTES_PREFIX}${text}`
       },
       confidence: {
         speechRecognition: speechConfidence,
@@ -228,7 +228,7 @@ export class VoiceDictationService {
       }
     }
 
-    return CONFIG.SPEECH.DEFAULT_FALLBACK_PHONE;
+    return speechConfig.DEFAULT_FALLBACK_PHONE;
   }
 
   /**
@@ -255,20 +255,20 @@ export class VoiceDictationService {
       }
     }
 
-    return CONFIG.SPEECH.DEFAULT_APPLICANT_NAME;
+    return speechConfig.DEFAULT_APPLICANT_NAME;
   }
 
   /**
    * Robust NLP method to parse city, street, and house number from unstructured speech transcript
    */
   private extractUkrainianAddress(text: string): { fullAddress: string; city: string; hasStreet: boolean; hasHouseNumber: boolean } {
-    let city: string = CONFIG.GEOCODING.DEFAULT_CITY_NAME;
+    let city: string = geoConfig.DEFAULT_CITY_NAME;
     const words = text.split(/\s+/);
 
     for (const w of words) {
       const cleanW = w.toLowerCase().replace(/[^а-яіїєґ]/g, '');
-      if (CONFIG.KNOWN_CITIES[cleanW]) {
-        city = CONFIG.KNOWN_CITIES[cleanW];
+      if (geoConfig.KNOWN_CITIES[cleanW]) {
+        city = geoConfig.KNOWN_CITIES[cleanW];
         break;
       }
     }
@@ -285,13 +285,13 @@ export class VoiceDictationService {
       };
     }
 
-    const implicitMatch = text.match(/(?:з|на|по)?\s*([а-яіїєґ]{4,}(?:\s+[а-яіїєґ]+)?)\s+(\d+[а-яА-Я\-]*)/i);
+    const implicitMatch = text.match(/(?:з|на|по)?\s*([а-яіїєґ]{4 }(?:\s+[а-яіїєґ]+)?)\s+(\d+[а-яА-Я\-]*)/i);
     if (implicitMatch) {
       let rawStreetCandidate = implicitMatch[1].trim();
       const houseNumber = implicitMatch[2].trim();
       const streetCandidate = this.normalizeStreetName(rawStreetCandidate);
 
-      if (streetCandidate.toLowerCase() === city.toLowerCase() || CONFIG.KNOWN_CITIES[streetCandidate.toLowerCase()]) {
+      if (streetCandidate.toLowerCase() === city.toLowerCase() || geoConfig.KNOWN_CITIES[streetCandidate.toLowerCase()]) {
         const afterCityMatch = text.match(new RegExp(`${city}\\s+([а-яіїєґ]+)\\s+(\\d+[а-яА-Я\\-]*)`, 'i'));
         if (afterCityMatch) {
           return {
@@ -322,7 +322,7 @@ export class VoiceDictationService {
     }
 
     return {
-      fullAddress: `м. ${city} (${CONFIG.SPEECH.FALLBACK_ADDRESS_SUFFIX})`,
+      fullAddress: `м. ${city} (${speechConfig.FALLBACK_ADDRESS_SUFFIX})`,
       city,
       hasStreet: false,
       hasHouseNumber: false
@@ -353,7 +353,7 @@ export class VoiceDictationService {
   private isReservedCityOrStreetWord(word: string): boolean {
     const lower = word.toLowerCase();
     return (
-      Boolean(CONFIG.KNOWN_CITIES[lower]) ||
+      Boolean(geoConfig.KNOWN_CITIES[lower]) ||
       ['вулиця', 'вул', 'проспект', 'просп', 'провулок', 'бульвар', 'будинок', 'квартира', 'водоканал', 'україна', 'доброго', 'дня', 'добрий', 'вечір', 'прийнято', 'номер', 'телефон', 'прорив', 'витік', 'люк', 'каналізація', 'хрещатик', 'соборна'].includes(lower)
     );
   }
@@ -382,6 +382,6 @@ export class VoiceDictationService {
         'Чи проводяться планові ремонтні роботи у вашому районі?'
       ];
     }
-    return [...CONFIG.SPEECH.SUGGESTED_QUESTIONS];
+    return [...speechConfig.SUGGESTED_QUESTIONS];
   }
 }

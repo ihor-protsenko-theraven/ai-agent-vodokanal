@@ -7,7 +7,7 @@ import {
   WsnTicketData
 } from '../types/ticket';
 import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
-import { CONFIG } from '../config/constants';
+import { authConfig, aiConfig, wsnConfig } from '../config';
 
 export type StateChangeListener = () => void;
 
@@ -24,7 +24,7 @@ export class TicketStateStore {
   private selectedDuplicate: TicketDuplicate | null = null;
   private isSubmitted: boolean = false;
   private isProcessingAudio: boolean = false;
-  private activeScenarioId: string = CONFIG.SCENARIOS.LOW_CONFIDENCE;
+  private activeScenarioId: string = aiConfig.SCENARIOS.LOW_CONFIDENCE;
 
   private listeners: Set<StateChangeListener> = new Set();
 
@@ -37,7 +37,7 @@ export class TicketStateStore {
 
   private restoreSession(): void {
     try {
-      const saved = sessionStorage.getItem(CONFIG.AUTH.STORAGE_KEY);
+      const saved = sessionStorage.getItem(authConfig.STORAGE_KEY);
       if (saved) {
         this.currentUser = JSON.parse(saved);
       }
@@ -78,10 +78,10 @@ export class TicketStateStore {
 
   private initVerifications(result: AgentProcessingResult): FieldVerificationStatus {
     const isGlobalReview = result.requiresManualReview;
-    const lowClassification = result.confidence.classification < CONFIG.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowAddress = result.confidence.addressExtraction < CONFIG.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowGeo = result.confidence.geocoding < CONFIG.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowSpeech = result.confidence.speechRecognition < CONFIG.CONFIDENCE_THRESHOLD || isGlobalReview;
+    const lowClassification = result.confidence.classification < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
+    const lowAddress = result.confidence.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
+    const lowGeo = result.confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
+    const lowSpeech = result.confidence.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
 
     return {
       appealType: !lowClassification,
@@ -123,10 +123,10 @@ export class TicketStateStore {
       if (addr.includes('хрещатик') || addr.includes('шевченка')) {
         this.result.duplicatesFound = [
           {
-            ticketId: `WSN-${CONFIG.WSN.CLASS_ID}-${CONFIG.WSN.DEFAULT_STATUS_ID}-0912`,
+            ticketId: `WSN-${wsnConfig.CLASS_ID}-${wsnConfig.DEFAULT_STATUS_ID}-0912`,
             matchReason: 'ADDRESS_MATCH',
             createdDate: new Date().toISOString().slice(0, 16).replace('T', ' '),
-            status: `${CONFIG.WSN.DEFAULT_STATUS_ID} (${CONFIG.WSN.DEFAULT_STATUS_NAME})`,
+            status: `${wsnConfig.DEFAULT_STATUS_ID} (${wsnConfig.DEFAULT_STATUS_NAME})`,
             addressText: this.result.ticket.addressText,
             appealType: this.result.ticket.appealType || 'Витік води'
           }
@@ -149,18 +149,18 @@ export class TicketStateStore {
     const pass = password.trim();
 
     if (
-      (user === CONFIG.AUTH.DEFAULT_ADMIN_USER && pass === CONFIG.AUTH.DEFAULT_ADMIN_PASS) ||
-      (user === CONFIG.AUTH.DEFAULT_OPERATOR_USER && pass === CONFIG.AUTH.DEFAULT_ADMIN_PASS)
+      (user === authConfig.DEFAULT_ADMIN_USER && pass === authConfig.DEFAULT_ADMIN_PASS) ||
+      (user === authConfig.DEFAULT_OPERATOR_USER && pass === authConfig.DEFAULT_ADMIN_PASS)
     ) {
-      const isAdmin = user === CONFIG.AUTH.DEFAULT_ADMIN_USER;
+      const isAdmin = user === authConfig.DEFAULT_ADMIN_USER;
       this.currentUser = {
         username: user,
-        displayName: isAdmin ? CONFIG.AUTH.ADMIN_DISPLAY_NAME : CONFIG.AUTH.OPERATOR_DISPLAY_NAME,
-        role: isAdmin ? CONFIG.AUTH.ADMIN_ROLE : CONFIG.AUTH.OPERATOR_ROLE,
-        operatorId: CONFIG.WSN.OPERATOR_ID
+        displayName: isAdmin ? authConfig.ADMIN_DISPLAY_NAME : authConfig.OPERATOR_DISPLAY_NAME,
+        role: isAdmin ? authConfig.ADMIN_ROLE : authConfig.OPERATOR_ROLE,
+        operatorId: wsnConfig.OPERATOR_ID
       };
       try {
-        sessionStorage.setItem(CONFIG.AUTH.STORAGE_KEY, JSON.stringify(this.currentUser));
+        sessionStorage.setItem(authConfig.STORAGE_KEY, JSON.stringify(this.currentUser));
       } catch {
         // Ignore session storage errors
       }
@@ -173,7 +173,7 @@ export class TicketStateStore {
   public logout(): void {
     this.currentUser = null;
     try {
-      sessionStorage.removeItem(CONFIG.AUTH.STORAGE_KEY);
+      sessionStorage.removeItem(authConfig.STORAGE_KEY);
     } catch {
       // Ignore
     }
@@ -276,13 +276,13 @@ export class TicketStateStore {
     switch (field) {
       case 'appealType':
       case 'ticketType':
-        return conf.classification < CONFIG.CONFIDENCE_THRESHOLD || isGlobal;
+        return conf.classification < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
       case 'addressText':
-        return conf.addressExtraction < CONFIG.CONFIDENCE_THRESHOLD || isGlobal;
+        return conf.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
       case 'coordinates':
-        return conf.geocoding < CONFIG.CONFIDENCE_THRESHOLD || isGlobal;
+        return conf.geocoding < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
       case 'notes':
-        return conf.speechRecognition < CONFIG.CONFIDENCE_THRESHOLD || isGlobal;
+        return conf.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
       default:
         return false;
     }

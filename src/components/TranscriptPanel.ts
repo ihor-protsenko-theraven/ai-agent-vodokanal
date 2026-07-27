@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { ClarificationMode } from '../types/ticket';
 import { escapeHtml } from '../utils/security';
-import { CONFIG } from '../config/constants';
+import { appConfig } from '../config';
 import { GeminiService } from '../services/GeminiService';
 import { VoiceDictationService } from '../services/VoiceDictationService';
 
@@ -60,7 +60,7 @@ export class TranscriptPanelComponent {
                   <span class="truncate">Транскрипція розмови WSN</span>
                   <span class="text-[10px] text-slate-400 font-normal whitespace-nowrap">00:32 / 01:45</span>
                 </h2>
-                <p class="text-[10px] sm:text-xs text-slate-400 truncate">STT: ${CONFIG.APP.STT_ENGINE} / Точність: ${(result.confidence.speechRecognition * 100).toFixed(0)}%</p>
+                <p class="text-[10px] sm:text-xs text-slate-400 truncate">STT: ${appConfig.STT_ENGINE} / Точність: ${(result.confidence.speechRecognition * 100).toFixed(0)}%</p>
               </div>
             </div>
 

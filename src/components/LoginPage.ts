@@ -1,5 +1,5 @@
 import { TicketStateStore } from '../services/TicketStateStore';
-import { CONFIG } from '../config/constants';
+import { appConfig, authConfig } from '../config';
 import { escapeHtml } from '../utils/security';
 
 export class LoginPageComponent {
@@ -26,9 +26,9 @@ export class LoginPageComponent {
               WSN
             </div>
             <div>
-              <h1 class="text-2xl font-extrabold text-white tracking-tight">${escapeHtml(CONFIG.APP.TITLE)}</h1>
+              <h1 class="text-2xl font-extrabold text-white tracking-tight">${escapeHtml(appConfig.TITLE)}</h1>
               <p class="text-xs text-sky-400 font-semibold tracking-wide uppercase mt-1">
-                ${escapeHtml(CONFIG.APP.SUBTITLE)}
+                ${escapeHtml(appConfig.SUBTITLE)}
               </p>
             </div>
           </div>
@@ -65,7 +65,7 @@ export class LoginPageComponent {
                   <input
                     type="text"
                     id="login-username"
-                    value="${escapeHtml(CONFIG.AUTH.DEFAULT_ADMIN_USER)}"
+                    value="${escapeHtml(authConfig.DEFAULT_ADMIN_USER)}"
                     placeholder="Введіть username"
                     required
                     class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono"
@@ -82,7 +82,7 @@ export class LoginPageComponent {
                   <input
                     type="password"
                     id="login-password"
-                    value="${escapeHtml(CONFIG.AUTH.DEFAULT_ADMIN_PASS)}"
+                    value="${escapeHtml(authConfig.DEFAULT_ADMIN_PASS)}"
                     placeholder="Введіть пароль"
                     required
                     class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono"
@@ -97,7 +97,7 @@ export class LoginPageComponent {
                   id="btn-autofill"
                   class="w-full py-2 px-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs text-sky-300 font-medium transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>🧪 Автозаповнення: <strong>${escapeHtml(CONFIG.AUTH.DEFAULT_ADMIN_USER)}</strong> / <strong>${escapeHtml(CONFIG.AUTH.DEFAULT_ADMIN_PASS)}</strong></span>
+                  <span>🧪 Автозаповнення: <strong>${escapeHtml(authConfig.DEFAULT_ADMIN_USER)}</strong> / <strong>${escapeHtml(authConfig.DEFAULT_ADMIN_PASS)}</strong></span>
                 </button>
               </div>
 
@@ -134,7 +134,7 @@ export class LoginPageComponent {
 
         const success = this.store.login(userInput, passInput);
         if (!success) {
-          this.errorMessage = `Невірне ім'я користувача або пароль. Використовуйте ${CONFIG.AUTH.DEFAULT_ADMIN_USER} / ${CONFIG.AUTH.DEFAULT_ADMIN_PASS}.`;
+          this.errorMessage = `Невірне ім'я користувача або пароль. Використовуйте ${authConfig.DEFAULT_ADMIN_USER} / ${authConfig.DEFAULT_ADMIN_PASS}.`;
           this.render();
         }
       });
@@ -146,8 +146,8 @@ export class LoginPageComponent {
         const userInput = this.container.querySelector('#login-username') as HTMLInputElement;
         const passInput = this.container.querySelector('#login-password') as HTMLInputElement;
         if (userInput && passInput) {
-          userInput.value = CONFIG.AUTH.DEFAULT_ADMIN_USER;
-          passInput.value = CONFIG.AUTH.DEFAULT_ADMIN_PASS;
+          userInput.value = authConfig.DEFAULT_ADMIN_USER;
+          passInput.value = authConfig.DEFAULT_ADMIN_PASS;
           this.errorMessage = '';
           this.render();
         }

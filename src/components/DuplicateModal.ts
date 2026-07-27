@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
-import { CONFIG } from '../config/constants';
+import { wsnConfig } from '../config';
 
 export class DuplicateModalComponent {
   private store: TicketStateStore;
@@ -34,7 +34,7 @@ export class DuplicateModalComponent {
               </div>
               <div>
                 <h3 class="text-base font-bold text-white">Знайдено дублікат заявки у WSN</h3>
-                <p class="text-xs text-slate-400">Перегляд існуючої заявки класу ${CONFIG.WSN.CLASS_ID}</p>
+                <p class="text-xs text-slate-400">Перегляд існуючої заявки класу ${wsnConfig.CLASS_ID}</p>
               </div>
             </div>
 
@@ -55,7 +55,7 @@ export class DuplicateModalComponent {
               </div>
               <div class="space-y-1.5 text-slate-300">
                 <p><strong class="text-slate-400">Причина збігу:</strong> <span class="text-amber-300 font-semibold">${escapeHtml(dup.matchReason)}</span></p>
-                <p><strong class="text-slate-400">Статус:</strong> <span class="text-sky-300">${escapeHtml(dup.status || `${CONFIG.WSN.DEFAULT_STATUS_ID} (${CONFIG.WSN.DEFAULT_STATUS_NAME})`)}</span></p>
+                <p><strong class="text-slate-400">Статус:</strong> <span class="text-sky-300">${escapeHtml(dup.status || `${wsnConfig.DEFAULT_STATUS_ID} (${wsnConfig.DEFAULT_STATUS_NAME})`)}</span></p>
                 <p><strong class="text-slate-400">Створено:</strong> ${escapeHtml(dup.createdDate || 'Сьогодні')}</p>
                 <p><strong class="text-slate-400">Адреса:</strong> ${escapeHtml(dup.addressText || currentForm.addressText)}</p>
                 <p><strong class="text-slate-400">Тип:</strong> ${escapeHtml(dup.appealType || currentForm.appealType)}</p>

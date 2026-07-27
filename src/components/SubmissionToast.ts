@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
-import { CONFIG } from '../config/constants';
+import { wsnConfig } from '../config';
 
 export class SubmissionToastComponent {
   private store: TicketStateStore;
@@ -22,27 +22,27 @@ export class SubmissionToastComponent {
     const result = this.store.getResult();
 
     const wsnPayload = {
-      wsnClassId: CONFIG.WSN.CLASS_ID,
-      wsnStatusId: CONFIG.WSN.DEFAULT_STATUS_ID,
-      statusName: CONFIG.WSN.DEFAULT_STATUS_NAME,
-      operatorId: CONFIG.WSN.OPERATOR_ID,
-      serviceAccount: CONFIG.WSN.SERVICE_ACCOUNT,
+      wsnClassId: wsnConfig.CLASS_ID,
+      wsnStatusId: wsnConfig.DEFAULT_STATUS_ID,
+      statusName: wsnConfig.DEFAULT_STATUS_NAME,
+      operatorId: wsnConfig.OPERATOR_ID,
+      serviceAccount: wsnConfig.SERVICE_ACCOUNT,
       callId: result.callId,
       properties: {
-        [`${CONFIG.WSN.PROPERTIES.APPEAL_TYPE}_appealType`]: formData.appealType,
-        [`${CONFIG.WSN.PROPERTIES.TICKET_TYPE}_ticketType`]: formData.ticketType,
-        [`${CONFIG.WSN.PROPERTIES.APPLICANT_NAME}_applicantName`]: formData.applicantName,
-        [`${CONFIG.WSN.PROPERTIES.APPLICANT_ADDRESS}_applicantAddress`]: formData.applicantAddress,
-        [`${CONFIG.WSN.PROPERTIES.ADDRESS_TEXT}_addressText`]: formData.addressText,
-        [`${CONFIG.WSN.PROPERTIES.COORDINATES}_coordinates`]: formData.coordinates,
-        [`${CONFIG.WSN.PROPERTIES.PHONE_NUMBER}_phoneNumber`]: formData.phoneNumber,
-        [`${CONFIG.WSN.PROPERTIES.INCIDENT_DATE_TIME}_incidentDateTime`]: formData.incidentDateTime,
-        [`${CONFIG.WSN.PROPERTIES.NOTES}_notes`]: formData.notes
+        [`${wsnConfig.PROPERTIES.APPEAL_TYPE}_appealType`]: formData.appealType,
+        [`${wsnConfig.PROPERTIES.TICKET_TYPE}_ticketType`]: formData.ticketType,
+        [`${wsnConfig.PROPERTIES.APPLICANT_NAME}_applicantName`]: formData.applicantName,
+        [`${wsnConfig.PROPERTIES.APPLICANT_ADDRESS}_applicantAddress`]: formData.applicantAddress,
+        [`${wsnConfig.PROPERTIES.ADDRESS_TEXT}_addressText`]: formData.addressText,
+        [`${wsnConfig.PROPERTIES.COORDINATES}_coordinates`]: formData.coordinates,
+        [`${wsnConfig.PROPERTIES.PHONE_NUMBER}_phoneNumber`]: formData.phoneNumber,
+        [`${wsnConfig.PROPERTIES.INCIDENT_DATE_TIME}_incidentDateTime`]: formData.incidentDateTime,
+        [`${wsnConfig.PROPERTIES.NOTES}_notes`]: formData.notes
       },
       confirmedAt: new Date().toISOString()
     };
 
-    const generatedTicketId = `WSN-${CONFIG.WSN.CLASS_ID}-${CONFIG.WSN.DEFAULT_STATUS_ID}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const generatedTicketId = `WSN-${wsnConfig.CLASS_ID}-${wsnConfig.DEFAULT_STATUS_ID}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     this.container.innerHTML = `
       <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -59,11 +59,11 @@ export class SubmissionToastComponent {
               <div class="flex items-center gap-2">
                 <h3 class="text-lg font-bold text-white">Заявку WSN успішно створено!</h3>
                 <span class="bg-emerald-500/20 text-emerald-300 font-mono text-xs px-2.5 py-0.5 rounded-full border border-emerald-500/40">
-                  Статус ${CONFIG.WSN.DEFAULT_STATUS_ID}
+                  Статус ${wsnConfig.DEFAULT_STATUS_ID}
                 </span>
               </div>
               <p class="text-xs text-slate-300">
-                Заявка класу <strong class="text-sky-300">${CONFIG.WSN.CLASS_ID}</strong> зареєстрована в WSN через API під номером 
+                Заявка класу <strong class="text-sky-300">${wsnConfig.CLASS_ID}</strong> зареєстрована в WSN через API під номером 
                 <span class="font-mono font-bold text-emerald-400">${escapeHtml(generatedTicketId)}</span>
               </p>
             </div>
