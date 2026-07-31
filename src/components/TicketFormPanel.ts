@@ -339,7 +339,7 @@ export class TicketFormPanelComponent {
         ${opts.type === 'select' ? `
           <select id="field-${opts.fieldKey}" data-field="${opts.fieldKey}" class="form-input w-full bg-slate-900 text-xs rounded-lg border border-slate-700 text-slate-100 p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none ${isLowConfidence && !isVerified ? 'low-confidence-field' : ''}">
             ${(opts.options || []).map(opt => `
-              <option value="${escapeHtml(opt)}" ${opt === opts.value ? 'selected' : ''}>${escapeHtml(opt)}</option>
+              <option value="${escapeHtml(opt)}" class="bg-slate-900 text-slate-100" ${opt === opts.value ? 'selected' : ''}>${escapeHtml(opt)}</option>
             `).join('')}
           </select>
         ` : opts.type === 'textarea' ? `
