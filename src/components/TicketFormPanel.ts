@@ -2,6 +2,8 @@ import { TicketStateStore } from '../services/TicketStateStore';
 import { FieldVerificationStatus, WsnTicketData } from '../types/ticket';
 import { escapeHtml } from '../utils/security';
 import { wsnConfig } from '../config';
+import { dropdownDataService } from '../services/DropdownDataService';
+import { geocodingService, AddressSearchResult, GeocodingProvider } from '../services/GeocodingService';
 
 export class TicketFormPanelComponent {
   private store: TicketStateStore;
@@ -22,6 +24,20 @@ export class TicketFormPanelComponent {
 
     const registrationBlocked = !result.requiresTicketRegistration && !isForceUnlocked;
     const duplicates = result.duplicatesFound || [];
+
+    // Get dropdown options from service
+    const appealTypes = dropdownDataService.getAppealTypes();
+    const ticketTypes = dropdownDataService.getTicketTypes();
+    const appealTypeOptions = appealTypes.length > 0 ? appealTypes.map(item => item.Value) : [...wsnConfig.OPTIONS.APPEAL_TYPES];
+    const ticketTypeOptions = ticketTypes.length > 0 ? ticketTypes.map(item => item.Value) : [...wsnConfig.OPTIONS.TICKET_TYPES];
+
+    const activeGeoProvider = geocodingService.getProvider();
+
+    const providerButtons: Record<string, { label: string; title: string }> = {
+      auto: { label: 'Авто', title: 'Спочатку Geodata.online, при відсутності результату — Nominatim' },
+      geodata: { label: 'Geodata', title: 'Пошук лише через Geodata.online (api.dmsolutions.com.ua)' },
+      nominatim: { label: 'Nominatim', title: 'Пошук лише через Nominatim (openstreetmap.org)' }
+    };
 
     this.container.innerHTML = `
       <div class="h-auto lg:h-full flex flex-col bg-slate-900 lg:overflow-hidden">
@@ -147,7 +163,7 @@ export class TicketFormPanelComponent {
                 fieldKey: 'appealType',
                 value: formData.appealType,
                 type: 'select',
-                options: [...wsnConfig.OPTIONS.APPEAL_TYPES],
+                options: appealTypeOptions,
                 confidenceKey: 'classification',
                 confidenceScore: confidence.classification,
                 isRequired: false
@@ -159,7 +175,7 @@ export class TicketFormPanelComponent {
                 fieldKey: 'ticketType',
                 value: formData.ticketType,
                 type: 'select',
-                options: [...wsnConfig.OPTIONS.TICKET_TYPES],
+                options: ticketTypeOptions,
                 confidenceKey: 'classification',
                 confidenceScore: confidence.classification,
                 isRequired: false
@@ -219,7 +235,7 @@ export class TicketFormPanelComponent {
               })}
             </div>
 
-            <!-- Address Text (WSN -389) -->
+            <!-- Address Text (WSN -389) + Geodata Address Search -->
             ${this.renderFormField({
               label: 'Текст адреси аварії (WSN -389)',
               fieldKey: 'addressText',
@@ -231,7 +247,36 @@ export class TicketFormPanelComponent {
               isRequired: false
             })}
 
-            <!-- Coordinates (WSN -420) - MANDATORY -->
+            <!-- Address Search: Provider Feature Switcher -->
+            <div class="p-3 rounded-xl border border-slate-800 bg-slate-950/40 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-[10px] text-slate-400 font-semibold">Джерело пошуку адрес:</span>
+                <div class="flex rounded-lg border border-slate-700 overflow-hidden text-[10px] font-semibold">
+                  ${(['auto', 'geodata', 'nominatim'] as const).map((provider) => `
+                    <button type="button" data-geo-provider="${provider}" title="${providerButtons[provider].title}"
+                      class="geo-provider-btn px-2.5 py-1.5 transition-all ${
+                        provider === activeGeoProvider
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                      }">${providerButtons[provider].label}</button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <input id="geo-search-input" type="text" value="${escapeHtml(formData.addressText || '')}" placeholder="Пошук адреси: місто, вулиця, будинок..." class="form-input flex-1 bg-slate-900 text-xs rounded-lg border border-slate-700 text-slate-100 p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none"/>
+                <button id="btn-geo-search" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                  </svg>
+                  Пошук
+                </button>
+              </div>
+              <div id="geo-search-status" class="hidden text-[10px] text-slate-400"></div>
+              <div id="geo-search-results" class="hidden max-h-44 overflow-y-auto space-y-1"></div>
+            </div>
+
+            <!-- Coordinates (WSN -420) - MANDATORY + Reverse Geocoding -->
             ${this.renderFormField({
               label: 'Координати (WSN -420) *ОБОВ\'ЯЗКОВЕ*',
               fieldKey: 'coordinates',
@@ -242,6 +287,17 @@ export class TicketFormPanelComponent {
               confidenceScore: confidence.geocoding,
               isRequired: true
             })}
+
+            <div class="flex items-center justify-between gap-2">
+              <button id="btn-reverse-geocode" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                Адреса за координатами
+              </button>
+              <span id="reverse-geo-status" class="hidden text-[10px] text-slate-400"></span>
+            </div>
 
             <!-- Notes (WSN 328) - MANDATORY -->
             ${this.renderFormField({
@@ -296,6 +352,7 @@ export class TicketFormPanelComponent {
     `;
 
     this.attachEvents();
+    this.scheduleAutoGeocode();
   }
 
   private renderFormField(opts: {
@@ -379,6 +436,9 @@ export class TicketFormPanelComponent {
         const fieldKey = target.dataset.field as keyof WsnTicketData;
         if (fieldKey) {
           this.store.updateFormField(fieldKey, target.value);
+          if (fieldKey === 'addressText') {
+            this.scheduleAutoGeocode();
+          }
         }
       });
     });
@@ -422,6 +482,235 @@ export class TicketFormPanelComponent {
           this.store.submitTicket();
         }
       });
+    }
+
+    // Geodata address search
+    const btnGeoSearch = this.container.querySelector('#btn-geo-search');
+    const geoSearchInput = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+    if (btnGeoSearch && geoSearchInput) {
+      const runSearch = () => this.handleAddressSearch(geoSearchInput.value || this.store.getFormData().addressText || '');
+      btnGeoSearch.addEventListener('click', runSearch);
+      geoSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runSearch();
+        }
+      });
+
+      // Search-as-you-type with debounce
+      geoSearchInput.addEventListener('input', () => {
+        if (this.geoSearchTimer) {
+          window.clearTimeout(this.geoSearchTimer);
+        }
+        this.geoSearchTimer = window.setTimeout(() => {
+          const query = geoSearchInput.value.trim();
+          if (query.length >= 3) {
+            this.handleAddressSearch(query);
+          } else if (query.length === 0) {
+            this.clearGeoResults();
+          }
+        }, 500);
+      });
+    }
+
+    // Provider feature switcher
+    const providerButtons = this.container.querySelectorAll<HTMLButtonElement>('.geo-provider-btn');
+    providerButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const provider = btn.dataset.geoProvider as GeocodingProvider | undefined;
+        if (!provider) return;
+
+        geocodingService.setProvider(provider);
+
+        // Update active button styles manually (avoid full re-render)
+        providerButtons.forEach(b => {
+          b.classList.remove('bg-sky-600', 'text-white');
+          b.classList.add('bg-slate-900', 'text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
+        });
+        btn.classList.add('bg-sky-600', 'text-white');
+        btn.classList.remove('bg-slate-900', 'text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
+
+        this.clearGeoResults();
+        const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+        if (input && input.value.trim().length >= 3) {
+          this.handleAddressSearch(input.value);
+        }
+      });
+    });
+
+    // Geodata address search results (delegated)
+    const geoResults = this.container.querySelector('#geo-search-results');
+    if (geoResults) {
+      geoResults.addEventListener('click', (e) => {
+        const target = (e.target as HTMLElement).closest<HTMLElement>('[data-geo-index]');
+        if (!target) return;
+        const index = Number(target.dataset.geoIndex);
+        const item = this.lastGeoSearchResults[index];
+        if (item) {
+          this.applyGeoResult(item);
+        }
+      });
+    }
+
+    // Reverse geocoding by coordinates
+    const btnReverse = this.container.querySelector('#btn-reverse-geocode');
+    if (btnReverse) {
+      btnReverse.addEventListener('click', () => this.handleReverseGeocode());
+    }
+  }
+
+  private lastGeoSearchResults: AddressSearchResult[] = [];
+  private geoSearchTimer: number | null = null;
+  private autoGeoTimer: number | null = null;
+  private autoGeoAttempted: string | null = null;
+
+  private clearGeoResults(): void {
+    if (this.geoSearchTimer) {
+      window.clearTimeout(this.geoSearchTimer);
+      this.geoSearchTimer = null;
+    }
+    const statusEl = this.container.querySelector('#geo-search-status');
+    const resultsEl = this.container.querySelector('#geo-search-results');
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.classList.add('hidden');
+    }
+    if (resultsEl) {
+      resultsEl.classList.add('hidden');
+      resultsEl.innerHTML = '';
+    }
+  }
+
+  /**
+   * Auto-geocode the address when it changes and coordinates are still empty.
+   */
+  private scheduleAutoGeocode(): void {
+    const address = (this.store.getFormData().addressText || '').trim();
+    if (!address || address === this.autoGeoAttempted) return;
+    if (this.store.getFormData().coordinates && this.store.getFormData().coordinates.trim()) return;
+
+    if (this.autoGeoTimer) {
+      window.clearTimeout(this.autoGeoTimer);
+    }
+    this.autoGeoTimer = window.setTimeout(() => this.runAutoGeocode(address), 700);
+  }
+
+  private async runAutoGeocode(address: string): Promise<void> {
+    this.autoGeoAttempted = address;
+    const currentCoords = (this.store.getFormData().coordinates || '').trim();
+    if (currentCoords) return;
+
+    const coords = await geocodingService.getCoordinates(address);
+    if (coords && !(this.store.getFormData().coordinates || '').trim()) {
+      this.store.updateFormField('coordinates', coords);
+    }
+  }
+
+  private async handleAddressSearch(rawQuery: string): Promise<void> {
+    const statusEl = this.container.querySelector('#geo-search-status');
+    const resultsEl = this.container.querySelector('#geo-search-results');
+    const query = rawQuery.trim();
+
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.classList.add('hidden');
+    }
+    if (resultsEl) {
+      resultsEl.classList.add('hidden');
+      resultsEl.innerHTML = '';
+    }
+
+    if (!query) {
+      if (statusEl) {
+        statusEl.textContent = 'Введіть адресу для пошуку.';
+        statusEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const results = await geocodingService.searchWithResults(query);
+    this.lastGeoSearchResults = results;
+
+    if (!resultsEl || !statusEl) return;
+
+    if (results.length === 0) {
+      statusEl.textContent = 'Адресу не знайдено. Спробуйте уточнити запит (місто, вулиця, будинок).';
+      statusEl.classList.remove('hidden');
+      return;
+    }
+
+    resultsEl.innerHTML = results.map((result, index) => {
+      const item = result.item;
+      const coords = result.coords;
+      return `
+        <button type="button" data-geo-index="${index}" class="w-full text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/50 transition-all cursor-pointer">
+          <div class="text-xs font-semibold text-slate-100">${escapeHtml(item.AddressString || '')}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5">
+            ${item.Index_ ? `Індекс: ${escapeHtml(item.Index_)} · ` : ''}${item.CityDistrict ? `Район: ${escapeHtml(item.CityDistrict)} · ` : ''}${coords ? `Координати: <span class="font-mono text-emerald-400">${escapeHtml(coords)}</span>` : 'Координати відсутні'}
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    resultsEl.classList.remove('hidden');
+  }
+
+  private applyGeoResult(result: AddressSearchResult): void {
+    if (result.item.AddressString) {
+      this.store.updateFormField('addressText', result.item.AddressString);
+    }
+    if (result.coords) {
+      this.store.updateFormField('coordinates', result.coords);
+    }
+  }
+
+  private async handleReverseGeocode(): Promise<void> {
+    const statusEl = this.container.querySelector('#reverse-geo-status');
+    const current = this.store.getFormData().coordinates || '';
+
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.classList.add('hidden');
+    }
+
+    const parts = current.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      if (statusEl) {
+        statusEl.textContent = 'Спочатку введіть координати у форматі "широта, довгота".';
+        statusEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      if (statusEl) {
+        statusEl.textContent = 'Невірний формат координат. Очікується "широта, довгота".';
+        statusEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (statusEl) {
+      statusEl.textContent = 'Пошук адреси...';
+      statusEl.classList.remove('hidden');
+    }
+
+    const address = await geocodingService.getAddressByCoordinates(lat, lng);
+
+    if (statusEl) {
+      if (address) {
+        statusEl.textContent = '';
+        statusEl.classList.add('hidden');
+      } else {
+        statusEl.textContent = 'Адресу за координатами не знайдено.';
+        statusEl.classList.remove('hidden');
+      }
+    }
+
+    if (address) {
+      this.store.updateFormField('addressText', address);
     }
   }
 }

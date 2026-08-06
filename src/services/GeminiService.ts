@@ -3,31 +3,7 @@ import { AgentProcessingResult } from '../types/ticket';
 import { aiConfig, geoConfig, speechConfig } from '../config';
 import { SCENARIO_HIGH_CONFIDENCE, SCENARIO_DUPLICATE_FOUND, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
 import { VoiceDictationService } from './VoiceDictationService';
-
-class GeoCodingService {
-  public static async getCoordinates(addressStr: string): Promise<string | null> {
-    if (!addressStr) return null;
-    
-    try {
-      const query = encodeURIComponent(`${ addressStr }, ${ geoConfig.DEFAULT_COUNTRY_SUFFIX } `);
-      const url = `${ geoConfig.NOMINATIM_BASE_URL }?q = ${ query }& format=json & limit=1`;
-      
-      const res = await fetch(url, {
-        headers: { 'User-Agent': geoConfig.USER_AGENT }
-      });
-      
-      if (!res.ok) return null;
-      
-      const items = await res.json();
-      if (items?.length > 0) {
-        return `${ parseFloat(items[0].lat).toFixed(4) }, ${ parseFloat(items[0].lon).toFixed(4) } `;
-      }
-    } catch (e) {
-      console.warn('[GeoCoding] Failed to geocode address:', e);
-    }
-    return null;
-  }
-}
+import { geocodingService } from './GeocodingService';
 
 export class GeminiService {
   private static instance: GeminiService;
@@ -163,7 +139,7 @@ const ticket = parsedResult.ticket;
 const hasNoCoords = !ticket.coordinates || !ticket.coordinates.trim();
 
 if (ticket.addressText && hasNoCoords) {
-  const coords = await GeoCodingService.getCoordinates(ticket.addressText);
+  const coords = await geocodingService.getCoordinates(ticket.addressText);
   if (coords) {
     ticket.coordinates = coords;
 

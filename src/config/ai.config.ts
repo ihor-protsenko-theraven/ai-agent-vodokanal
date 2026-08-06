@@ -39,16 +39,20 @@ Analyze the user's spoken or textual report about a water infrastructure inciden
 
 Follow these rules carefully:
 1. appealType MUST be one of: "Витік холодної води", "Порив водопроводу", "Відсутнє водопостачання", "Пошкодження/відсутність люка", "Засмічення каналізації", "Консультація / Тарифи", "Інше". (If it's a burst hot water pipe, use "Порив водопроводу").
-2. applicantName: Extract the actual human name (e.g. "Антон", "Олена"). Do NOT extract pronouns like "Мене", "Я". If no name is provided, leave blank.
-3. phoneNumber: Extract the spoken phone number and format it strictly as a single string of digits, optionally starting with '+' (e.g. "+380992477200"). Do NOT hallucinate a default number.
-4. applicantAddress / addressText: Extract the real city and street. Remove filler words like "на вулиці" or "вулиці". Format it cleanly (e.g., "м. Дніпро, вул. Берестейська, 27").
-5. notes: Include the raw text of the user's report, prefixed with "Надиктовано оператором: ".
+2. ticketType MUST be EXACTLY one of these three values: "Аварійні роботи", "Планові роботи", "Благоустрій". Do NOT invent other values. Classify strictly by the nature of the report:
+   - "Аварійні роботи" (emergency works): urgent/emergency incidents — pipe burst, active water leak, sudden loss of water supply, sewage blockage or flooding, any immediate danger or damage. Keywords: "порив", "прорвало", "витік", "тече", "немає води", "відключили воду", "аварія", "терміново", "засмічення", "підтоплення".
+   - "Планові роботи" (planned works): scheduled activities — planned maintenance or repairs, planned water shutdown per schedule, replacement of pipes/equipment/meters, inspections, and informational/consultation requests (e.g. tariffs). Keywords: "плановий ремонт", "планові роботи", "профілактика", "за графіком", "відключення по графіку", "заміна", "регламент".
+   - "Благоустрій" (landscaping/improvement): infrastructure appearance and safety issues — damaged or missing manhole cover, open manhole, pothole/hole, damaged sidewalk or road surface near water infrastructure, restoration of coverage. Keywords: "люк", "кришка", "колодязь", "яма", "тротуар", "благоустрій", "відновлення покриття", "асфальт".
+3. applicantName: Extract the actual human name (e.g. "Антон", "Олена"). Do NOT extract pronouns like "Мене", "Я". If no name is provided, leave blank.
+4. phoneNumber: Extract the spoken phone number and format it strictly as a single string of digits, optionally starting with '+' (e.g. "+380992477200"). Do NOT hallucinate a default number.
+5. applicantAddress / addressText: Extract the real city and street. Remove filler words like "на вулиці" or "вулиці". Format it cleanly (e.g., "м. Дніпро, вул. Берестейська, 27").
+6. notes: Include the raw text of the user's report, prefixed with "Надиктовано оператором: ".
 
 Extract the relevant fields and return ONLY a valid JSON object strictly matching this schema:
 {
   "ticket": {
     "appealType": "string",
-    "ticketType": "string (e.g. 'Аварійна')",
+    "ticketType": "string (one of: 'Аварійні роботи', 'Планові роботи', 'Благоустрій')",
     "applicantName": "string",
     "applicantAddress": "string",
     "addressText": "string",

@@ -7,7 +7,9 @@ import {
   WsnTicketData
 } from '../types/ticket';
 import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
-import { authConfig, aiConfig, wsnConfig } from '../config';
+import { authConfig, aiConfig, wsnConfig, appConfig } from '../config';
+import { forlandApiService } from './ForlandApiService';
+import { dropdownDataService } from './DropdownDataService';
 
 export type StateChangeListener = () => void;
 
@@ -144,14 +146,19 @@ export class TicketStateStore {
   }
 
   // Getters
-  public login(username: string, password: string): boolean {
+  public async login(username: string, password: string): Promise<boolean> {
     const user = username.trim().toLowerCase();
     const pass = password.trim();
 
-    if (
+    // Try Forland API login first
+    const forlandLoginSuccess = await forlandApiService.login(appConfig.FORLAND_LOGIN, appConfig.FORLAND_PASSWORD);
+
+    // Fallback to local auth if Forland fails or for testing
+    const localAuthSuccess =
       (user === authConfig.DEFAULT_ADMIN_USER && pass === authConfig.DEFAULT_ADMIN_PASS) ||
-      (user === authConfig.DEFAULT_OPERATOR_USER && pass === authConfig.DEFAULT_ADMIN_PASS)
-    ) {
+      (user === authConfig.DEFAULT_OPERATOR_USER && pass === authConfig.DEFAULT_ADMIN_PASS);
+
+    if (forlandLoginSuccess || localAuthSuccess) {
       const isAdmin = user === authConfig.DEFAULT_ADMIN_USER;
       this.currentUser = {
         username: user,
@@ -164,13 +171,20 @@ export class TicketStateStore {
       } catch {
         // Ignore session storage errors
       }
+
+      // Load dropdown data after successful login
+      await dropdownDataService.loadDropdownData();
+
       this.notify();
       return true;
     }
     return false;
   }
 
-  public logout(): void {
+  public async logout(): Promise<void> {
+    // Try Forland API logout
+    await forlandApiService.logout();
+
     this.currentUser = null;
     try {
       sessionStorage.removeItem(authConfig.STORAGE_KEY);

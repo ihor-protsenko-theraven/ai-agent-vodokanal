@@ -13,7 +13,7 @@ export const SCENARIO_HIGH_CONFIDENCE: AgentProcessingResult = {
 [00:18] Заявник: Мій телефон +380638887766, Павло. Дякую!`,
   ticket: {
     appealType: 'Пошкодження/відсутність люка',
-    ticketType: 'Аварійна',
+    ticketType: 'Благоустрій',
     applicantName: 'Павло Сергійович',
     applicantAddress: 'просп. Берестейський, 88, кв. 12',
     addressText: 'просп. Берестейський, 88 (на тротуарі)',
@@ -48,7 +48,7 @@ export const SCENARIO_DUPLICATE_FOUND: AgentProcessingResult = {
 [00:10] AI-Агент: Фіксую ваше звернення. За цією адресою вже зареєстровано активний аварійний виклик.`,
   ticket: {
     appealType: 'Порив водопроводу',
-    ticketType: 'Аварійна',
+    ticketType: 'Аварійні роботи',
     applicantName: 'Марія Сергіївна',
     applicantAddress: 'вул. Хрещатик, 15, кв. 4',
     addressText: 'вул. Хрещатик, 15',
@@ -103,7 +103,7 @@ export const SCENARIO_LOW_CONFIDENCE: AgentProcessingResult = {
 [00:31] Заявник: Це прямо біля магазину "Квіти", орієнтовно Шевченка, 42A.`,
   ticket: {
     appealType: 'Витік холодної води',
-    ticketType: 'Аварійна',
+    ticketType: 'Аварійні роботи',
     applicantName: 'Коваленко Іван Петрович',
     applicantAddress: 'вул. Тараса Шевченка, 42, кв. 15',
     addressText: 'вул. Тараса Шевченка, 42A (біля маг. Квіти)',
@@ -139,7 +139,7 @@ export const SCENARIO_NO_REGISTRATION: AgentProcessingResult = {
 [00:18] Заявник: Ні, дякую, це все що хотіла дізнатися.`,
   ticket: {
     appealType: 'Консультація / Тарифи',
-    ticketType: 'Інформаційна',
+    ticketType: 'Планові роботи',
     applicantName: 'Олена Анатоліївна',
     applicantAddress: '',
     addressText: 'м. Київ (без конкретної адреси)',

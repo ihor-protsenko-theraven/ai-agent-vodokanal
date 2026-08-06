@@ -11,6 +11,7 @@ export const wsnConfig = {
   PROPERTIES: {
     APPEAL_TYPE: '1958',
     TICKET_TYPE: '1972',
+    TICKET_TYPE_SYSTEM_ID: 10197, // System Type ID for "Тип заявки" (works with API)
     APPLICANT_NAME: '1961',
     APPLICANT_ADDRESS: '1960',
     ADDRESS_TEXT: '-389',
@@ -30,10 +31,9 @@ export const wsnConfig = {
       'Інше'
     ] as const,
     TICKET_TYPES: [
-      'Аварійна',
-      'Планова',
-      'Інформаційна',
-      'Інше'
+      'Аварійні роботи',
+      'Планові роботи',
+      'Благоустрій'
     ] as const
   }
 } as const;

@@ -1,5 +1,6 @@
 import { AgentProcessingResult } from '../types/ticket';
 import { aiConfig, geoConfig, speechConfig, wsnConfig } from '../config';
+import { geocodingService } from './GeocodingService';
 
 export class VoiceDictationService {
   private static instance: VoiceDictationService;
@@ -93,7 +94,7 @@ export class VoiceDictationService {
 
     // 2. Detect Ticket Type & Registration Requirement (Scenario 4: Tariff Consultation)
     const isConsultation = appealType === wsnConfig.OPTIONS.APPEAL_TYPES[5];
-    const ticketType = isConsultation ? wsnConfig.OPTIONS.TICKET_TYPES[2] : wsnConfig.OPTIONS.TICKET_TYPES[0];
+    const ticketType = isConsultation ? wsnConfig.OPTIONS.TICKET_TYPES[1] : this.classifyTicketType(lower);
     const requiresTicketRegistration = !isConsultation;
 
     // 3. High-Precision Phone Number Extraction
@@ -113,23 +114,10 @@ export class VoiceDictationService {
       addressText = `м. ${detectedCity}, Борщагівка (нечітка адреса / біля ринку)`;
     }
 
-    // 6. Automated Geocoding via Nominatim API
+    // 6. Automated Geocoding via Geodata.online API (with Nominatim as fallback)
     let coordinates = '';
     if (addressText && !addressText.includes(speechConfig.FALLBACK_ADDRESS_SUFFIX) && !isVagueLocation) {
-      try {
-        const queryStr = encodeURIComponent(`${addressText}, ${geoConfig.DEFAULT_COUNTRY_SUFFIX}`);
-        const res = await fetch(`${geoConfig.NOMINATIM_BASE_URL}?q=${queryStr}&format=json&limit=1`, {
-          headers: { 'User-Agent': geoConfig.USER_AGENT }
-        });
-        if (res.ok) {
-          const items = await res.json();
-          if (items && items.length > 0) {
-            coordinates = `${parseFloat(items[0].lat).toFixed(4)}, ${parseFloat(items[0].lon).toFixed(4)}`;
-          }
-        }
-      } catch {
-        coordinates = detectedCity === 'Вінниця' ? geoConfig.VINNYTSIA_COORDINATES : geoConfig.DEFAULT_COORDINATES;
-      }
+      coordinates = (await geocodingService.getCoordinates(addressText)) ?? '';
     }
 
     if (!coordinates) {
@@ -201,6 +189,25 @@ export class VoiceDictationService {
       suggestedQuestions,
       duplicatesFound
     };
+  }
+
+  /**
+   * Classify ticket type into one of three WSN values:
+   * "Аварійні роботи", "Планові роботи", "Благоустрій".
+   */
+  private classifyTicketType(lowerText: string): string {
+    // Благоустрій: люки, ями, покриття, тротуари
+    if (/\b(люк|кришк|колодяз|яма|благоустрій|тротуар|відновленн|асфальт|огородженн)\b/.test(lowerText)) {
+      return wsnConfig.OPTIONS.TICKET_TYPES[2];
+    }
+
+    // Планові роботи: плановий ремонт, профілактика, графік, заміна
+    if (/\b(планов|профілактик|за графіком|регламент|заміна|замен|планова|відключенн.*графік)\b/.test(lowerText)) {
+      return wsnConfig.OPTIONS.TICKET_TYPES[1];
+    }
+
+    // За замовчуванням — аварійні роботи (витік, порив, немає води, засмічення тощо)
+    return wsnConfig.OPTIONS.TICKET_TYPES[0];
   }
 
   /**

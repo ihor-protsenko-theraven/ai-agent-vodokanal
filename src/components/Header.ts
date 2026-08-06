@@ -102,8 +102,8 @@ export class HeaderComponent {
 
     const btnLogout = this.container.querySelector('#btn-logout');
     if (btnLogout) {
-      btnLogout.addEventListener('click', () => {
-        this.store.logout();
+      btnLogout.addEventListener('click', async () => {
+        await this.store.logout();
       });
     }
   }

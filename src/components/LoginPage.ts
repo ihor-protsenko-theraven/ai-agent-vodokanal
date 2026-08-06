@@ -127,12 +127,12 @@ export class LoginPageComponent {
   private attachEvents(): void {
     const form = this.container.querySelector('#login-form') as HTMLFormElement;
     if (form) {
-      form.addEventListener('submit', (e) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const userInput = (this.container.querySelector('#login-username') as HTMLInputElement).value;
         const passInput = (this.container.querySelector('#login-password') as HTMLInputElement).value;
 
-        const success = this.store.login(userInput, passInput);
+        const success = await this.store.login(userInput, passInput);
         if (!success) {
           this.errorMessage = `Невірне ім'я користувача або пароль. Використовуйте ${authConfig.DEFAULT_ADMIN_USER} / ${authConfig.DEFAULT_ADMIN_PASS}.`;
           this.render();
