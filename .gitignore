@@ -26,6 +26,8 @@ dist-ssr/
 
 # Editor & IDE directories
 .idea/
+.devin/
+.vscode/
 *.suo
 *.ntvs*
 *.njsproj

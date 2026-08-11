@@ -7,33 +7,14 @@
  * - Prod: Vercel serverless function (/api/forland)
  */
 
-interface LoginRequest {
-  login: string;
-  p: string;
-}
-
-interface RepositoryChild {
-  ID: number;
-  Title?: string;
-  Value?: string;
-  ValueIDs?: number[];
-}
-
-interface RepositoryMetaClasses {
-  systemType?: { Childs?: RepositoryChild[] };
-  systemTypeValue?: { Childs?: RepositoryChild[] };
-}
-
-interface RepositoryResponse {
-  logical?: {
-    metaClasses?: RepositoryMetaClasses;
-  };
-}
-
-interface ValueItem {
-  ID: number;
-  Value: string;
-}
+import { apiConfig } from '../config';
+import {
+  GetListParams,
+  GetListResponse,
+  LoginRequest,
+  RepositoryResponse,
+  ValueItem
+} from '../types/forland';
 
 class ForlandApiService {
   private baseUrl: string = import.meta.env.DEV ? '/forland' : '/api/forland';
@@ -44,10 +25,11 @@ class ForlandApiService {
    */
   async login(login: string, password: string): Promise<boolean> {
     try {
+      const request: LoginRequest = { login, p: password };
       const formData = new FormData();
-      formData.append('request', JSON.stringify({ login, p: password }));
+      formData.append('request', JSON.stringify(request));
 
-      const response = await fetch(`${this.baseUrl}/Account/login`, {
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.LOGIN_PATH}`, {
         method: 'POST',
         body: formData,
         credentials: 'include'
@@ -75,7 +57,7 @@ class ForlandApiService {
    */
   async logout(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/Account/logout`, {
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.LOGOUT_PATH}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -94,14 +76,14 @@ class ForlandApiService {
    */
   async getRepository(): Promise<RepositoryResponse | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/Meta/GetRepository`, {
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.REPOSITORY_PATH}`, {
         method: 'GET',
         credentials: 'include'
       });
 
       if (response.ok) {
         const data = await response.json();
-        return data;
+        return data as RepositoryResponse;
       }
 
       return null;
@@ -149,6 +131,48 @@ class ForlandApiService {
   }
 
   /**
+   * Get objects list by kindUnitID (class code).
+   * kindUnitID is required; stateID and logID are optional filters.
+   * Returns a flat list of { ID, Value: Title } suitable for dropdowns.
+   */
+  async getList(params: GetListParams): Promise<ValueItem[] | null> {
+    try {
+      const query = new URLSearchParams();
+      query.set('kindUnitID', String(params.kindUnitID));
+      if (params.stateID != null) {
+        query.set('stateID', String(params.stateID));
+      }
+      if (params.logID != null) {
+        query.set('logID', String(params.logID));
+      }
+
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.GET_LIST_PATH}?${query.toString()}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data: unknown = await response.json();
+      if (!Array.isArray(data)) {
+        return null;
+      }
+
+      return (data as GetListResponse)
+        .filter((item) => item && item.ID != null && item.Title)
+        .map((item) => ({
+          ID: item.ID,
+          Value: String(item.Title).trim()
+        }));
+    } catch (error) {
+      console.error('GetList error:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check if authenticated
    */
   isAuthenticated(): boolean {
@@ -157,4 +181,4 @@ class ForlandApiService {
 }
 
 export const forlandApiService = new ForlandApiService();
-export type { LoginRequest, RepositoryChild, RepositoryResponse, ValueItem };
+export type { GetListParams, GetListResponse, LoginRequest, RepositoryResponse, ValueItem };

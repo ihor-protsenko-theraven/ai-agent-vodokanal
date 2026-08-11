@@ -1,6 +1,8 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
 import { wsnConfig } from '../config';
+import { WsnSubmitPayload } from '../types/wsn';
+import { generateWsnTicketId } from '../utils/wsn';
 
 export class SubmissionToastComponent {
   private store: TicketStateStore;
@@ -21,7 +23,7 @@ export class SubmissionToastComponent {
     const formData = this.store.getFormData();
     const result = this.store.getResult();
 
-    const wsnPayload = {
+    const wsnPayload: WsnSubmitPayload = {
       wsnClassId: wsnConfig.CLASS_ID,
       wsnStatusId: wsnConfig.DEFAULT_STATUS_ID,
       statusName: wsnConfig.DEFAULT_STATUS_NAME,
@@ -42,7 +44,7 @@ export class SubmissionToastComponent {
       confirmedAt: new Date().toISOString()
     };
 
-    const generatedTicketId = `WSN-${wsnConfig.CLASS_ID}-${wsnConfig.DEFAULT_STATUS_ID}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const generatedTicketId = generateWsnTicketId(wsnConfig.CLASS_ID, wsnConfig.DEFAULT_STATUS_ID);
 
     this.container.innerHTML = `
       <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">

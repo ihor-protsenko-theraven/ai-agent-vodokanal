@@ -1,12 +1,12 @@
 # 💧 Vodokanal WSN — AI Dispatcher (Operator Workstation)
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)
-![Vite](https://img.shields.io/badge/Vite-5.2-646CFF.svg)
+![Vite](https://img.shields.io/badge/Vite-8.0-646CFF.svg)
 ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-38B2AC.svg)
 ![Gemini AI](https://img.shields.io/badge/Google_Gemini-1.5_/_2.5-4285F4.svg)
 ![WSN Class](https://img.shields.io/badge/WSN_Class-27772-orange.svg)
 
-An intelligent Automated Operator Workstation (ARM) for municipal Water Supply Network (Vodokanal) dispatchers. Designed to automate call intake, transcript extraction, geocoding, duplicate checking, and ticket registration for emergency and informational requests using **Google Gemini AI**.
+An intelligent Automated Operator Workstation (ARM) for municipal Water Supply Network (Vodokanal) dispatchers. Designed to automate call intake, transcript extraction, geocoding, duplicate checking, and ticket registration for emergency and informational requests using **Google Gemini AI** and **Forland API integration**.
 
 ---
 
@@ -22,10 +22,25 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
   - Automatically structures unstructured voice or text transcripts into the official WSN schema (Classification `27772`).
   - Calculates confidence scores ($0–100\%$) for each extracted attribute and an overall score.
   - Visual color coding for field confidence (Green $\ge 85\%$, Yellow $70–84\%$, Red $< 70\%$).
+  - Support for multiple Gemini models (1.5 Flash, 2.5 Flash, 1.5 Pro, etc.)
+
+- **🧠 NLP Processing (Ukrainian Language)**:
+  - Custom Ukrainian address parser with street name normalization and aliases.
+  - Phone number extraction with Ukrainian format support (+38 prefix).
+  - Appeal type classification using keyword-based detection.
+  - Applicant name extraction with common Ukrainian name recognition.
+  - Intelligent question generation based on incident type.
 
 - **🗺️ Automated Geocoding (OpenStreetMap / Nominatim)**:
   - Converts extracted street addresses into geographical coordinates (Latitude, Longitude).
   - Supports reverse geocoding and fallback default coordinates.
+  - Multiple geocoding service integration (Nominatim, custom geodata service).
+
+- **🔗 Forland API Integration**:
+  - Secure authentication with Forland system.
+  - Repository data retrieval for dropdown options.
+  - Object list filtering by kindUnitID, stateID, and logID.
+  - CORS handling via Vite dev server proxy and Vercel serverless function.
 
 - **🔍 Duplicate Detection**:
   - Automatically checks active database records within geographic proximity for matching incident types.
@@ -33,6 +48,7 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 
 - **🎙️ Voice Dictation (Web Speech API)**:
   - Real-time speech-to-text dictation directly from the operator's microphone (Ukrainian `uk-UA` support).
+  - Confidence-based speech recognition scoring.
 
 - **⚡ Pre-loaded Demo Scenarios**:
   - **Scenario 1 (Pipe Burst / High Confidence)**: Complete details extracted, ready for instant registration.
@@ -43,6 +59,7 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 - **🔐 Authentication & Role Management**:
   - Role-based access: `Chief Dispatcher (Admin)` and `ARM Operator`.
   - Dynamic in-app Gemini API Key configuration.
+  - Forland API session management.
 
 ---
 
@@ -51,11 +68,14 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 | Component | Technology |
 | :--- | :--- |
 | **Language** | [TypeScript 5.4](https://www.typescriptlang.org/) (Strict Mode) |
-| **Bundler & Dev Server** | [Vite 5.2](https://vitejs.dev/) |
+| **Bundler & Dev Server** | [Vite 8.0](https://vitejs.dev/) |
 | **Styling & UI** | [Tailwind CSS 3.4](https://tailwindcss.com/) + PostCSS |
 | **AI Model** | [Google Gemini 1.5 / 2.5 Flash](https://ai.google.dev/) |
+| **NLP Processing** | Custom Ukrainian NLP parsers & classifiers |
 | **Geocoding API** | [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/) |
+| **Enterprise API** | [Forland API](https://zhytomyr.forland-solution.com/) |
 | **Speech Recognition** | Web Speech API (`SpeechRecognition`) |
+| **Deployment** | [Vercel](https://vercel.com/) + Serverless Functions |
 
 ---
 
@@ -63,6 +83,8 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 
 ```
 ai-agent-vodokanal/
+├── api/
+│   └── forland.js                # Vercel serverless function for Forland API proxy
 ├── public/
 │   └── assets/
 │       └── scenarios/            # Text files for test call scenarios
@@ -74,20 +96,59 @@ ai-agent-vodokanal/
 │   │   ├── SubmissionToast.ts    # Success/cancellation toast notifications
 │   │   ├── TicketFormPanel.ts    # WSN Class 27772 ticket creation form
 │   │   └── TranscriptPanel.ts    # Audio transcript & voice dictation panel
-│   ├── config/
-│   │   └── constants.ts          # WSN attributes, thresholds, and configuration
-│   ├── services/
-│   │   ├── GeminiService.ts      # Google Gemini API integration service
-│   │   ├── TicketStateStore.ts   # Central reactive state store (Singleton)
-│   │   └── VoiceDictationService.ts # Speech recognition service
+│   ├── config/                   # Configuration files
+│   │   ├── ai.config.ts          # AI prompts, models, and confidence thresholds
+│   │   ├── api.config.ts         # API endpoints and paths
+│   │   ├── app.config.ts         # Application settings
+│   │   ├── auth.config.ts        # Authentication configuration
+│   │   ├── geo.config.ts         # Geocoding service settings
+│   │   ├── nlp.config.ts         # NLP processing constants (Ukrainian)
+│   │   ├── speech.config.ts      # Speech recognition settings
+│   │   ├── ui.config.ts          # UI component configuration
+│   │   ├── wsn.config.ts         # WSN domain mapping and attributes
+│   │   └── index.ts              # Config exports
+│   ├── mock/
+│   │   └── mockData.ts           # Mock data for testing
+│   ├── services/                 # Business logic and API services
+│   │   ├── nlp/                  # NLP processing services
+│   │   │   ├── AppealTypeClassifier.ts      # Appeal type classification
+│   │   │   ├── ApplicantNameExtractor.ts   # Name extraction logic
+│   │   │   ├── PhoneExtractor.ts            # Phone number extraction
+│   │   │   ├── QuestionGenerator.ts         # Dynamic question generation
+│   │   │   └── UkrainianAddressParser.ts    # Ukrainian address parsing
+│   │   ├── DropdownDataService.ts  # Dropdown data management
+│   │   ├── DuplicateFinder.ts        # Duplicate detection logic
+│   │   ├── ForlandApiService.ts      # Forland API integration
+│   │   ├── GeminiService.ts          # Google Gemini API integration
+│   │   ├── GeocodingService.ts       # Geocoding service orchestration
+│   │   ├── GeodataService.ts        # Geodata management
+│   │   ├── NominatimService.ts       # OpenStreetMap Nominatim API
+│   │   ├── TicketStateStore.ts       # Central reactive state store (Singleton)
+│   │   └── VoiceDictationService.ts  # Speech recognition service
 │   ├── types/                    # TypeScript interfaces and data models
+│   │   ├── dropdown.ts           # Dropdown data types
+│   │   ├── forland.ts            # Forland API types
+│   │   ├── gemini.ts             # Gemini API types
+│   │   ├── geocoding.ts          # Geocoding types
+│   │   ├── geodata.ts            # Geodata types
+│   │   ├── index.ts              # Type exports
+│   │   ├── nlp.ts                # NLP processing types
+│   │   ├── ticket.ts             # Ticket data models
+│   │   ├── ui.ts                 # UI component types
+│   │   └── wsn.ts                # WSN domain types
+│   ├── utils/                    # Utility functions
+│   │   ├── security.ts           # Security utilities
+│   │   ├── text.ts               # Text processing utilities
+│   │   └── wsn.ts                # WSN-specific utilities
 │   ├── app.ts                    # Main UI controller & layout switcher
 │   ├── main.ts                   # Vite application entry point
 │   └── style.css                 # Custom CSS & Tailwind directives
+├── .env.example                  # Environment variables template
 ├── index.html                    # Base HTML layout
 ├── package.json                  # Dependencies & npm scripts
 ├── tsconfig.json                 # TypeScript compiler configuration
 ├── tailwind.config.js            # Tailwind CSS configuration
+├── vite.config.ts                # Vite configuration
 └── vercel.json                   # Vercel deployment configuration
 ```
 
@@ -122,18 +183,34 @@ npm run build
 ```
 The compiled assets will be placed in the `dist/` directory.
 
+### 5. Environment Configuration
+Create a `.env` file based on `.env.example`:
+```bash
+cp .env.example .env
+```
+
+Required environment variables:
+- `VITE_GEMINI_API_KEY`: Your Google Gemini API key
+- Forland API credentials are configured through the application UI
+
 ---
 
 ## 🌐 Deployment & CI/CD (Vercel)
 
-The project includes a pre-configured Vercel build setup (`vercel.json`) and an automated GitHub Actions CI/CD workflow (`.github/workflows/deploy.yml`).
+The project includes a pre-configured Vercel build setup (`vercel.json`) and a serverless function for Forland API proxy (`api/forland.js`).
 
-### Option A: Automatic Git Integration (Recommended)
+### Development
+- Uses Vite dev server proxy for Forland API (`/forland` -> `https://zhytomyr.forland-solution.com`)
+- Configure in `vite.config.ts`
+
+### Production Deployment
 1. Import your GitHub repository into the [Vercel Dashboard](https://vercel.com/new).
 2. Vercel automatically detects Vite settings from `vercel.json` (`npm run build` -> `dist`).
-3. Every `git push` or Pull Request will automatically generate Preview and Production deployments.
+3. The serverless function `api/forland.js` handles Forland API proxy with CORS headers.
+4. Configure environment variables in Vercel dashboard:
+   - `VITE_GEMINI_API_KEY`: Your Google Gemini API key
 
-### Option B: GitHub Actions Workflow
+### GitHub Actions Workflow (Optional)
 If using the included `.github/workflows/deploy.yml`, configure the following Repository Secrets in GitHub (`Settings > Secrets and variables > Actions`):
 - `VERCEL_TOKEN`: Personal Access Token generated in Vercel Account Settings.
 - `VERCEL_ORG_ID`: Found in `.vercel/project.json` or Vercel Team settings.
@@ -165,8 +242,63 @@ If using the included `.github/workflows/deploy.yml`, configure the following Re
   - `1258` — Incident Timestamp
   - `328` — Notes / Additional Details
 
+## 🧪 Testing & Development
+
+### Mock Data
+The project includes comprehensive mock data in `src/mock/mockData.ts` for:
+- Dropdown options (appeal types, ticket types, etc.)
+- Geographic data
+- Sample tickets for duplicate detection
+- Forland API responses
+
+### NLP Processing Features
+- **Ukrainian Address Parser**: Handles street name normalization, aliases, and vague address detection
+- **Phone Number Extraction**: Supports multiple Ukrainian phone formats (+38 prefix, local formats)
+- **Appeal Type Classification**: Keyword-based classification with 15+ appeal types
+- **Name Extraction**: Recognizes common Ukrainian names and explicit name patterns
+- **Question Generation**: Context-aware questions based on incident type
+
+### Confidence Scoring System
+- **Speech Recognition**: 96% (default), 85% (short speech)
+- **Classification**: 94% (default)
+- **Address Extraction**: 92% (full), 78% (street only), 62% (vague)
+- **Geocoding**: 88% (full), 70% (fallback), 54% (vague)
+- **Visual Indicators**: Green (≥85%), Yellow (70-84%), Red (<70%)
+
 ---
 
 ## 📄 License
 
 Developed for municipal water supply companies. All rights reserved © 2026 WSN AI Dispatcher System.
+
+## 🏗️ Architecture Overview
+
+The application follows a modular architecture with clear separation of concerns:
+
+1. **UI Layer**: React-like components built with vanilla TypeScript and Tailwind CSS
+2. **State Management**: Centralized `TicketStateStore` using the Singleton pattern for reactive state
+3. **Service Layer**: Dedicated services for each external API (Gemini, Forland, Nominatim, Voice)
+4. **NLP Pipeline**: Custom Ukrainian language processing pipeline for text analysis
+5. **Configuration**: Centralized configuration management in `src/config/`
+6. **Type Safety**: Comprehensive TypeScript interfaces for all data models
+
+## 🔧 API Integration Details
+
+### Forland API
+- **Authentication**: Session-based with secure cookie handling
+- **Proxy Configuration**: 
+  - Development: Vite proxy server
+  - Production: Vercel serverless function with CORS headers
+- **Endpoints**: Login, Logout, Repository, GetList, Dropdown Options
+- **Cookie Management**: Automatic domain and path rewriting for cross-origin requests
+
+### Gemini AI
+- **Models**: Supports multiple Gemini models (1.5 Flash, 2.5 Flash, 1.5 Pro, etc.)
+- **Temperature**: Low temperature (0.1) for consistent outputs
+- **System Prompts**: Customized for water utility domain
+- **Response Format**: Structured JSON with confidence scores
+
+### OpenStreetMap Nominatim
+- **Geocoding**: Address to coordinates conversion
+- **Rate Limiting**: Respects Nominatim usage policy
+- **Fallback**: Custom geodata service for improved accuracy

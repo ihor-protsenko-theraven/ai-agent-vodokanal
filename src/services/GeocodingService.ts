@@ -8,15 +8,9 @@
  * Used across voice processing, Gemini enrichment and the manual address search UI.
  */
 
-import { geoConfig } from '../config';
-import { geodataService, GeodataAddress } from './GeodataService';
-
-export type GeocodingProvider = 'auto' | 'geodata' | 'nominatim';
-
-export interface AddressSearchResult {
-  item: GeodataAddress;
-  coords: string | null;
-}
+import { geodataService } from './GeodataService';
+import { nominatimService } from './NominatimService';
+import { AddressSearchResult, GeocodingProvider } from '../types/geocoding';
 
 class GeocodingService {
   private provider: GeocodingProvider = 'auto';
@@ -36,14 +30,14 @@ class GeocodingService {
     if (!addressStr || !addressStr.trim()) return null;
 
     if (this.provider === 'nominatim') {
-      return this.nominatimCoordinates(addressStr);
+      return nominatimService.geocode(addressStr);
     }
 
     const geodataCoords = await geodataService.getCoordinates(addressStr);
     if (geodataCoords) return geodataCoords;
 
     if (this.provider === 'auto') {
-      return this.nominatimCoordinates(addressStr);
+      return nominatimService.geocode(addressStr);
     }
 
     return null;
@@ -54,14 +48,14 @@ class GeocodingService {
    */
   async getAddressByCoordinates(lat: number, lng: number): Promise<string | null> {
     if (this.provider === 'nominatim') {
-      return this.nominatimReverse(lat, lng);
+      return nominatimService.reverse(lat, lng);
     }
 
     const geodata = await geodataService.reverseGeocode(lat, lng);
     if (geodata?.AddressString) return geodata.AddressString;
 
     if (this.provider === 'auto') {
-      return this.nominatimReverse(lat, lng);
+      return nominatimService.reverse(lat, lng);
     }
 
     return null;
@@ -75,7 +69,7 @@ class GeocodingService {
     if (!addressStr || !addressStr.trim()) return [];
 
     if (this.provider === 'nominatim') {
-      const nominatim = await this.nominatimFirst(addressStr);
+      const nominatim = await nominatimService.search(addressStr);
       return nominatim ? [nominatim] : [];
     }
 
@@ -90,7 +84,7 @@ class GeocodingService {
     }
 
     if (results.length === 0 && this.provider === 'auto') {
-      const nominatim = await this.nominatimFirst(addressStr);
+      const nominatim = await nominatimService.search(addressStr);
       if (nominatim) {
         results.push(nominatim);
       }
@@ -98,74 +92,7 @@ class GeocodingService {
 
     return results;
   }
-
-  private async nominatimCoordinates(addressStr: string): Promise<string | null> {
-    try {
-      const query = encodeURIComponent(`${addressStr}, ${geoConfig.DEFAULT_COUNTRY_SUFFIX}`);
-      const url = `${geoConfig.NOMINATIM_BASE_URL}?q=${query}&format=json&limit=1`;
-
-      const res = await fetch(url, {
-        headers: { 'User-Agent': geoConfig.USER_AGENT }
-      });
-
-      if (!res.ok) return null;
-
-      const items = await res.json();
-      if (items?.length > 0) {
-        return `${parseFloat(items[0].lat).toFixed(4)}, ${parseFloat(items[0].lon).toFixed(4)}`;
-      }
-    } catch (e) {
-      console.warn('[GeoCoding] Nominatim geocode failed:', e);
-    }
-    return null;
-  }
-
-  private async nominatimFirst(addressStr: string): Promise<AddressSearchResult | null> {
-    try {
-      const query = encodeURIComponent(`${addressStr}, ${geoConfig.DEFAULT_COUNTRY_SUFFIX}`);
-      const url = `${geoConfig.NOMINATIM_BASE_URL}?q=${query}&format=json&limit=3`;
-
-      const res = await fetch(url, {
-        headers: { 'User-Agent': geoConfig.USER_AGENT }
-      });
-
-      if (!res.ok) return null;
-
-      const items = await res.json();
-      if (items?.length > 0) {
-        const first = items[0];
-        return {
-          item: {
-            AddressString: first.display_name || addressStr,
-            Lat_: String(first.lat),
-            Long_: String(first.lon)
-          },
-          coords: `${parseFloat(first.lat).toFixed(4)}, ${parseFloat(first.lon).toFixed(4)}`
-        };
-      }
-    } catch (e) {
-      console.warn('[GeoCoding] Nominatim search failed:', e);
-    }
-    return null;
-  }
-
-  private async nominatimReverse(lat: number, lng: number): Promise<string | null> {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=uk`;
-
-      const res = await fetch(url, {
-        headers: { 'User-Agent': geoConfig.USER_AGENT }
-      });
-
-      if (!res.ok) return null;
-
-      const data = await res.json();
-      return data?.display_name || null;
-    } catch (e) {
-      console.warn('[GeoCoding] Nominatim reverse failed:', e);
-      return null;
-    }
-  }
 }
 
 export const geocodingService = new GeocodingService();
+export type { AddressSearchResult, GeocodingProvider };

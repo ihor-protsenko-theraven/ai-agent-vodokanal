@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
-import { wsnConfig } from '../config';
+import { wsnConfig, uiConfig } from '../config';
 
 export class DuplicateModalComponent {
   private store: TicketStateStore;
@@ -55,7 +55,7 @@ export class DuplicateModalComponent {
               </div>
               <div class="space-y-1.5 text-slate-300">
                 <p><strong class="text-slate-400">Причина збігу:</strong> <span class="text-amber-300 font-semibold">${escapeHtml(dup.matchReason)}</span></p>
-                <p><strong class="text-slate-400">Статус:</strong> <span class="text-sky-300">${escapeHtml(dup.status || `${wsnConfig.DEFAULT_STATUS_ID} (${wsnConfig.DEFAULT_STATUS_NAME})`)}</span></p>
+                <p><strong class="text-slate-400">Статус:</strong> <span class="text-sky-300">${escapeHtml(dup.status || uiConfig.DEFAULT_STATUS_LABEL(wsnConfig.DEFAULT_STATUS_ID, wsnConfig.DEFAULT_STATUS_NAME))}</span></p>
                 <p><strong class="text-slate-400">Створено:</strong> ${escapeHtml(dup.createdDate || 'Сьогодні')}</p>
                 <p><strong class="text-slate-400">Адреса:</strong> ${escapeHtml(dup.addressText || currentForm.addressText)}</p>
                 <p><strong class="text-slate-400">Тип:</strong> ${escapeHtml(dup.appealType || currentForm.appealType)}</p>

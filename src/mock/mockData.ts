@@ -12,7 +12,7 @@ export const SCENARIO_HIGH_CONFIDENCE: AgentProcessingResult = {
 [00:11] AI-Агент: Заявку прийнято. Небезпечна ділянка біля будинку 88 по просп. Берестейському. Направляю бригаду для встановлення огородження.
 [00:18] Заявник: Мій телефон +380638887766, Павло. Дякую!`,
   ticket: {
-    appealType: 'Пошкодження/відсутність люка',
+    appealType: 'Відкритий колодязь',
     ticketType: 'Благоустрій',
     applicantName: 'Павло Сергійович',
     applicantAddress: 'просп. Берестейський, 88, кв. 12',
@@ -47,7 +47,7 @@ export const SCENARIO_DUPLICATE_FOUND: AgentProcessingResult = {
 [00:04] Заявник (Марія Сергіївна): Знову телефоную щодо витоку на Хрещатику 15! Воду у подвірʼї так і не перекрили!
 [00:10] AI-Агент: Фіксую ваше звернення. За цією адресою вже зареєстровано активний аварійний виклик.`,
   ticket: {
-    appealType: 'Порив водопроводу',
+    appealType: 'Витік води',
     ticketType: 'Аварійні роботи',
     applicantName: 'Марія Сергіївна',
     applicantAddress: 'вул. Хрещатик, 15, кв. 4',
@@ -75,7 +75,7 @@ export const SCENARIO_DUPLICATE_FOUND: AgentProcessingResult = {
       createdDate: '2026-07-24 21:30',
       status: '5996 (На виконання)',
       addressText: 'вул. Хрещатик, 15',
-      appealType: 'Порив водопроводу'
+      appealType: 'Витік води'
     },
     {
       ticketId: 'WSN-27772-5041-0799',
@@ -102,7 +102,7 @@ export const SCENARIO_LOW_CONFIDENCE: AgentProcessingResult = {
 [00:24] AI-Агент: Дякую за уточнення. Потрібно перевірити координати та орієнтири для виїзду аварійної бригади.
 [00:31] Заявник: Це прямо біля магазину "Квіти", орієнтовно Шевченка, 42A.`,
   ticket: {
-    appealType: 'Витік холодної води',
+    appealType: 'Витік води',
     ticketType: 'Аварійні роботи',
     applicantName: 'Коваленко Іван Петрович',
     applicantAddress: 'вул. Тараса Шевченка, 42, кв. 15',

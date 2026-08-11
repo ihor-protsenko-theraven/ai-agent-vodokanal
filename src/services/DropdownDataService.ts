@@ -3,17 +3,14 @@
  * Manages dropdown options loaded from Forland API
  */
 
-import { forlandApiService, ValueItem } from './ForlandApiService';
+import { forlandApiService } from './ForlandApiService';
+import { ValueItem } from '../types/forland';
+import { DropdownData } from '../types/dropdown';
 import { wsnConfig } from '../config';
 
-interface DropdownData {
-  appealTypes: ValueItem[];
-  ticketTypes: ValueItem[];
-  isLoading: boolean;
-  error: string | null;
-}
-
 class DropdownDataService {
+  private static STORAGE_KEY = 'wsn_dropdown_data';
+
   private data: DropdownData = {
     appealTypes: [],
     ticketTypes: [],
@@ -23,16 +20,62 @@ class DropdownDataService {
 
   private listeners: Set<() => void> = new Set();
 
+  constructor() {
+    this.restoreFromCache();
+  }
+
+  /**
+   * Restore dropdown options from localStorage so they are available immediately after a page refresh.
+   */
+  private restoreFromCache(): void {
+    try {
+      const raw = localStorage.getItem(DropdownDataService.STORAGE_KEY);
+      if (!raw) return;
+
+      const cached = JSON.parse(raw) as { appealTypes?: ValueItem[]; ticketTypes?: ValueItem[] };
+      if (Array.isArray(cached.appealTypes)) {
+        this.data.appealTypes = cached.appealTypes;
+      }
+      if (Array.isArray(cached.ticketTypes)) {
+        this.data.ticketTypes = cached.ticketTypes;
+      }
+    } catch {
+      // Ignore corrupted cache
+    }
+  }
+
+  /**
+   * Persist current dropdown options to localStorage.
+   */
+  private saveToCache(): void {
+    try {
+      localStorage.setItem(
+        DropdownDataService.STORAGE_KEY,
+        JSON.stringify({
+          appealTypes: this.data.appealTypes,
+          ticketTypes: this.data.ticketTypes,
+          savedAt: Date.now()
+        })
+      );
+    } catch {
+      // Ignore storage errors (private mode, quota, etc.)
+    }
+  }
+
   /**
    * Load dropdown data from API
    */
   async loadDropdownData(): Promise<void> {
+    if (this.data.isLoading) {
+      return;
+    }
+
     this.data.isLoading = true;
     this.data.error = null;
     this.notify();
 
     try {
-      // Load ticket types using system type ID (10197 for "Тип заявки")
+      // Ticket types using system type ID (10197 for "Тип заявки")
       const ticketTypesData = await forlandApiService.getDropdownOptionsBySystemType(
         wsnConfig.PROPERTIES.TICKET_TYPE_SYSTEM_ID
       );
@@ -41,11 +84,14 @@ class DropdownDataService {
         this.data.ticketTypes = ticketTypesData;
       }
 
-      // Appeal types (Тип звернення) use static config - not available via API
-      this.data.appealTypes = wsnConfig.OPTIONS.APPEAL_TYPES.map((value, index) => ({
-        ID: index + 1,
-        Value: value
-      }));
+      // Appeal types (Тип звернення) from GetList API by kindUnitID
+      const appealTypesData = await forlandApiService.getList({
+        kindUnitID: wsnConfig.APPEAL_TYPE_KIND_UNIT_ID
+      });
+
+      if (appealTypesData) {
+        this.data.appealTypes = appealTypesData;
+      }
 
       // If API fails for ticket types, fall back to static config
       if (!ticketTypesData || ticketTypesData.length === 0) {
@@ -54,6 +100,16 @@ class DropdownDataService {
           Value: value
         }));
       }
+
+      // If API fails for appeal types, fall back to static config
+      if (!appealTypesData || appealTypesData.length === 0) {
+        this.data.appealTypes = wsnConfig.OPTIONS.APPEAL_TYPES.map((value, index) => ({
+          ID: index + 1,
+          Value: value
+        }));
+      }
+
+      this.saveToCache();
 
     } catch (error) {
       console.error('Failed to load dropdown data:', error);
@@ -107,6 +163,13 @@ class DropdownDataService {
    */
   isLoading(): boolean {
     return this.data.isLoading;
+  }
+
+  /**
+   * Check if any dropdown data is already available (from cache or API)
+   */
+  hasData(): boolean {
+    return this.data.appealTypes.length > 0 || this.data.ticketTypes.length > 0;
   }
 
   /**

@@ -5,6 +5,7 @@ import { TicketFormPanelComponent } from './components/TicketFormPanel';
 import { DuplicateModalComponent } from './components/DuplicateModal';
 import { SubmissionToastComponent } from './components/SubmissionToast';
 import { LoginPageComponent } from './components/LoginPage';
+import { dropdownDataService } from './services/DropdownDataService';
 
 export class TicketDispatcherUI {
   private store: TicketStateStore;
@@ -34,6 +35,16 @@ export class TicketDispatcherUI {
 
     // Subscribe to state store changes
     this.store.subscribe(() => {
+      this.renderAll();
+    });
+
+    // After a page refresh the session is restored from storage but dropdown
+    // data may be stale/empty: refresh from API in the background and re-render
+    // when the data changes (cached values are already available immediately).
+    if (this.store.isAuthenticated()) {
+      void dropdownDataService.loadDropdownData();
+    }
+    dropdownDataService.subscribe(() => {
       this.renderAll();
     });
   }

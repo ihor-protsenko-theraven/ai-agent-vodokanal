@@ -15,6 +15,7 @@ export const aiConfig = {
 
   CONFIDENCE_THRESHOLD: 0.7,
   HIGH_CONFIDENCE_THRESHOLD: 0.85,
+  SHORT_SPEECH_THRESHOLD: 15,
   CONFIDENCE_SCORES: {
     SPEECH_DEFAULT: 0.96,
     SPEECH_SHORT: 0.85,
@@ -22,15 +23,18 @@ export const aiConfig = {
     ADDRESS_FULL: 0.92,
     ADDRESS_STREET_ONLY: 0.78,
     ADDRESS_LOW: 0.62,
+    ADDRESS_VAGUE: 0.62,
     GEOCODING_FULL: 0.88,
-    GEOCODING_FALLBACK: 0.70
+    GEOCODING_FALLBACK: 0.70,
+    GEOCODING_VAGUE: 0.54
   },
 
   SCENARIOS: {
     LOW_CONFIDENCE: 'low-confidence',
     DUPLICATES_FOUND: 'duplicates-found',
     NO_REGISTRATION: 'no-registration',
-    HIGH_CONFIDENCE: 'high-confidence'
+    HIGH_CONFIDENCE: 'high-confidence',
+    REAL_AUDIO: 'real-audio'
   },
 
   PROMPTS: {
@@ -38,7 +42,7 @@ export const aiConfig = {
 Analyze the user's spoken or textual report about a water infrastructure incident.
 
 Follow these rules carefully:
-1. appealType MUST be one of: "Витік холодної води", "Порив водопроводу", "Відсутнє водопостачання", "Пошкодження/відсутність люка", "Засмічення каналізації", "Консультація / Тарифи", "Інше". (If it's a burst hot water pipe, use "Порив водопроводу").
+1. appealType MUST be one of: "Витік води", "Провал", "Низький тиск води", "Відсутність Води", "Брудна вода", "Закупорка", "Витік на каналізації", "Відкритий колодязь", "Пошкоджена кришка колодязя", "Несправність засувки", "Планові роботи", "Встановлення лічильника", "Благоустрій", "Заміна трубопроводу", "Консультація / Тарифи". Do NOT invent other values.
 2. ticketType MUST be EXACTLY one of these three values: "Аварійні роботи", "Планові роботи", "Благоустрій". Do NOT invent other values. Classify strictly by the nature of the report:
    - "Аварійні роботи" (emergency works): urgent/emergency incidents — pipe burst, active water leak, sudden loss of water supply, sewage blockage or flooding, any immediate danger or damage. Keywords: "порив", "прорвало", "витік", "тече", "немає води", "відключили воду", "аварія", "терміново", "засмічення", "підтоплення".
    - "Планові роботи" (planned works): scheduled activities — planned maintenance or repairs, planned water shutdown per schedule, replacement of pipes/equipment/meters, inspections, and informational/consultation requests (e.g. tariffs). Keywords: "плановий ремонт", "планові роботи", "профілактика", "за графіком", "відключення по графіку", "заміна", "регламент".

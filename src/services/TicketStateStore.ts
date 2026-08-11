@@ -7,9 +7,11 @@ import {
   WsnTicketData
 } from '../types/ticket';
 import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
-import { authConfig, aiConfig, wsnConfig, appConfig } from '../config';
+import { authConfig, aiConfig, wsnConfig, uiConfig } from '../config';
 import { forlandApiService } from './ForlandApiService';
 import { dropdownDataService } from './DropdownDataService';
+import { DuplicateFinder } from './DuplicateFinder';
+import { formatDateTimeInput } from '../utils/wsn';
 
 export type StateChangeListener = () => void;
 
@@ -27,6 +29,8 @@ export class TicketStateStore {
   private isSubmitted: boolean = false;
   private isProcessingAudio: boolean = false;
   private activeScenarioId: string = aiConfig.SCENARIOS.LOW_CONFIDENCE;
+
+  private duplicateFinder = new DuplicateFinder();
 
   private listeners: Set<StateChangeListener> = new Set();
 
@@ -73,7 +77,7 @@ export class TicketStateStore {
       addressText: ticketPartial.addressText || '',
       coordinates: ticketPartial.coordinates || '',
       phoneNumber: ticketPartial.phoneNumber || '',
-      incidentDateTime: ticketPartial.incidentDateTime || new Date().toISOString().slice(0, 16),
+      incidentDateTime: ticketPartial.incidentDateTime || formatDateTimeInput(new Date()),
       notes: ticketPartial.notes || ''
     };
   }
@@ -115,24 +119,19 @@ export class TicketStateStore {
   }
 
   public loadRealResult(realResult: AgentProcessingResult): void {
-    this.activeScenarioId = 'real-audio';
+    this.activeScenarioId = aiConfig.SCENARIOS.REAL_AUDIO;
     this.isProcessingAudio = false;
     this.result = realResult;
 
     // Automated duplicate check against WSN database
     if ((!this.result.duplicatesFound || this.result.duplicatesFound.length === 0) && this.result.requiresTicketRegistration) {
-      const addr = (this.result.ticket.addressText || '').toLowerCase();
-      if (addr.includes('хрещатик') || addr.includes('шевченка')) {
-        this.result.duplicatesFound = [
-          {
-            ticketId: `WSN-${wsnConfig.CLASS_ID}-${wsnConfig.DEFAULT_STATUS_ID}-0912`,
-            matchReason: 'ADDRESS_MATCH',
-            createdDate: new Date().toISOString().slice(0, 16).replace('T', ' '),
-            status: `${wsnConfig.DEFAULT_STATUS_ID} (${wsnConfig.DEFAULT_STATUS_NAME})`,
-            addressText: this.result.ticket.addressText,
-            appealType: this.result.ticket.appealType || 'Витік води'
-          }
-        ];
+      const found = this.duplicateFinder.find({
+        addressText: this.result.ticket.addressText || '',
+        searchText: this.result.ticket.addressText || '',
+        appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
+      });
+      if (found.length > 0) {
+        this.result.duplicatesFound = found;
       }
     }
 
@@ -151,7 +150,10 @@ export class TicketStateStore {
     const pass = password.trim();
 
     // Try Forland API login first
-    const forlandLoginSuccess = await forlandApiService.login(appConfig.FORLAND_LOGIN, appConfig.FORLAND_PASSWORD);
+    const forlandLoginSuccess = await forlandApiService.login(
+      authConfig.DEFAULT_ADMIN_USER,
+      authConfig.DEFAULT_ADMIN_PASS
+    );
 
     // Fallback to local auth if Forland fails or for testing
     const localAuthSuccess =
@@ -275,9 +277,9 @@ export class TicketStateStore {
 
   public appendSuggestedQuestion(questionText: string): void {
     if (this.formData.notes) {
-      this.formData.notes += `\nУточнення: ${questionText}`;
+      this.formData.notes += `\n${uiConfig.NOTES_CLARIFICATION_PREFIX}${questionText}`;
     } else {
-      this.formData.notes = `Уточнення: ${questionText}`;
+      this.formData.notes = `${uiConfig.NOTES_CLARIFICATION_PREFIX}${questionText}`;
     }
     this.notify();
   }
@@ -332,23 +334,17 @@ export class TicketStateStore {
     const errors: string[] = [];
 
     if (!this.formData.coordinates || !this.formData.coordinates.trim()) {
-      errors.push('Обов\'язкове поле "Координати (-420)" не заповнене');
+      errors.push(`Обов\'язкове поле "${wsnConfig.FIELD_LABELS.coordinates}" не заповнене`);
     }
     if (!this.formData.notes || !this.formData.notes.trim()) {
-      errors.push('Обов\'язкове поле "Примітки (328)" не заповнене');
+      errors.push(`Обов\'язкове поле "${wsnConfig.FIELD_LABELS.notes}" не заповнене`);
     }
 
-    const fieldsToVerify: { key: keyof FieldVerificationStatus; name: string }[] = [
-      { key: 'appealType', name: 'Тип звернення (1958)' },
-      { key: 'ticketType', name: 'Тип заявки (1972)' },
-      { key: 'addressText', name: 'Текст адреси (-389)' },
-      { key: 'coordinates', name: 'Координати (-420)' },
-      { key: 'notes', name: 'Примітки (328)' }
-    ];
+    const fieldsToVerify: (keyof FieldVerificationStatus)[] = ['appealType', 'ticketType', 'addressText', 'coordinates', 'notes'];
 
-    for (const f of fieldsToVerify) {
-      if (this.isFieldLowConfidence(f.key) && !this.verifications[f.key]) {
-        errors.push(`Не підтверджено поле з низькою впевненістю: "${f.name}"`);
+    for (const field of fieldsToVerify) {
+      if (this.isFieldLowConfidence(field) && !this.verifications[field]) {
+        errors.push(`Не підтверджено поле з низькою впевненістю: "${wsnConfig.FIELD_LABELS[field]}"`);
       }
     }
 

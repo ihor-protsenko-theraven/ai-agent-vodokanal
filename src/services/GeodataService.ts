@@ -11,40 +11,7 @@
  */
 
 import { geoConfig } from '../config';
-
-export interface GeodataAddress {
-  Id?: number;
-  AddressString?: string | null;
-  Index_?: string | null;
-  Region?: string | null;
-  Area?: string | null;
-  City?: string | null;
-  Suburb?: string | null;
-  SettlementType?: string | null;
-  KOATUU?: string | null;
-  PhoneCode?: string | null;
-  StreetId?: number | null;
-  StrType?: string | null;
-  Street?: string | null;
-  HouseId?: number | null;
-  HouseNum?: string | null;
-  HouseNumAdd?: string | null;
-  Lat?: string | null;
-  Long?: string | null;
-  Lat_?: string | null;
-  Long_?: string | null;
-  Lat_S?: string | null;
-  Long_S?: string | null;
-  AddressLevel?: string | null;
-  CityDistrict?: string | null;
-  MetroStation?: string | null;
-  MetroLine?: string | null;
-  MetroDistance?: string | null;
-  KATO?: string | null;
-  Hromada?: string | null;
-  Distance?: string | null;
-  TerrStatus?: string | null;
-}
+import { GeodataAddress } from '../types/geodata';
 
 class GeodataService {
   private baseUrl: string = geoConfig.GEODATA_BASE_URL;
@@ -100,7 +67,7 @@ class GeodataService {
         sRequest: candidate,
         sLang: lang || this.defaultLang
       });
-      const data = await this.get<GeodataAddress[]>(`/api/Address?${query}`);
+      const data = await this.get<GeodataAddress[]>(`${geoConfig.GEODATA_ADDRESS_PATH}?${query}`);
 
       if (Array.isArray(data) && data.length > 0) {
         for (const item of data) {
@@ -126,7 +93,7 @@ class GeodataService {
       sRequest: this.normalizeRequest(request),
       sLang: lang || this.defaultLang
     });
-    const data = await this.get<GeodataAddress[]>(`/api/FullAddress?${query}`);
+    const data = await this.get<GeodataAddress[]>(`${geoConfig.GEODATA_FULL_ADDRESS_PATH}?${query}`);
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
   }
 
@@ -139,7 +106,7 @@ class GeodataService {
       lng: lng,
       sLang: lang || this.defaultLang
     });
-    const data = await this.get<GeodataAddress[]>(`/api/ReverseGeocoding?${query}`);
+    const data = await this.get<GeodataAddress[]>(`${geoConfig.GEODATA_REVERSE_GEOCODING_PATH}?${query}`);
     return Array.isArray(data) && data.length > 0 ? data[0] : null;
   }
 
@@ -173,17 +140,11 @@ class GeodataService {
   private normalizeRequest(request: string): string {
     let q = request.trim();
 
-    q = q
-      .replace(/\bвулиця\b/gi, 'вул')
-      .replace(/\bвул\./gi, 'вул')
-      .replace(/\bпроспект\b/gi, 'просп')
-      .replace(/\bпровулок\b/gi, 'пров')
-      .replace(/\bбульвар\b/gi, 'бул')
-      .replace(/\bмайдан\b/gi, 'майд')
-      .replace(/\bнабережна\b/gi, 'наб')
-      .replace(/\bплоща\b/gi, 'площ')
-      .replace(/\bмісто\b/gi, 'м.')
-      .replace(/\bУкраїна\b/gi, '');
+    for (const [word, short] of Object.entries(geoConfig.STREET_TYPE_ALIASES)) {
+      q = q.replace(new RegExp(`\\b${word}\\b`, 'gi'), short);
+    }
+
+    q = q.replace(geoConfig.COUNTRY_SUFFIX_PATTERN, '');
 
     // Collapse "м.", "вул." etc. dots to spaces and squeeze whitespace
     q = q
@@ -201,8 +162,8 @@ class GeodataService {
    * "Житомир Київська 24" -> "Житомир вул Київська 24".
    */
   private ensureStreetKeyword(q: string): string {
-    const hasStreetType = /\b(вул|вулиця|просп|проспект|пров|провулок|бул|бульвар|майд|майдан|шосе|наб|набережна|площ|площа)\b/i.test(q);
-    if (hasStreetType) return q;
+    const streetTypePattern = new RegExp(`\\b(${geoConfig.STREET_TYPE_KEYWORDS.join('|')})\\b`, 'i');
+    if (streetTypePattern.test(q)) return q;
 
     const parts = q.split(' ').filter(Boolean);
     if (parts.length < 2) return q;
@@ -220,7 +181,7 @@ class GeodataService {
     const lat = address.Lat ?? address.Lat_ ?? address.Lat_S;
     const lng = address.Long ?? address.Long_ ?? address.Long_S;
     if (!lat || !lng) return null;
-    return `${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}`;
+    return `${parseFloat(lat).toFixed(geoConfig.COORDINATE_PRECISION)}, ${parseFloat(lng).toFixed(geoConfig.COORDINATE_PRECISION)}`;
   }
 
   /**
@@ -250,3 +211,4 @@ class GeodataService {
 }
 
 export const geodataService = new GeodataService();
+export type { GeodataAddress };

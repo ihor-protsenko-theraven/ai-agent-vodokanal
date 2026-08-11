@@ -1,9 +1,11 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { FieldVerificationStatus, WsnTicketData } from '../types/ticket';
+import { FormFieldDefinition } from '../types/ui';
 import { escapeHtml } from '../utils/security';
-import { wsnConfig } from '../config';
+import { aiConfig, geoConfig, wsnConfig, uiConfig } from '../config';
 import { dropdownDataService } from '../services/DropdownDataService';
 import { geocodingService, AddressSearchResult, GeocodingProvider } from '../services/GeocodingService';
+import { formatDateTimeInput } from '../utils/wsn';
 
 export class TicketFormPanelComponent {
   private store: TicketStateStore;
@@ -33,11 +35,7 @@ export class TicketFormPanelComponent {
 
     const activeGeoProvider = geocodingService.getProvider();
 
-    const providerButtons: Record<string, { label: string; title: string }> = {
-      auto: { label: 'Авто', title: 'Спочатку Geodata.online, при відсутності результату — Nominatim' },
-      geodata: { label: 'Geodata', title: 'Пошук лише через Geodata.online (api.dmsolutions.com.ua)' },
-      nominatim: { label: 'Nominatim', title: 'Пошук лише через Nominatim (openstreetmap.org)' }
-    };
+    const providerButtons = uiConfig.GEO_PROVIDER_BUTTONS;
 
     this.container.innerHTML = `
       <div class="h-auto lg:h-full flex flex-col bg-slate-900 lg:overflow-hidden">
@@ -52,7 +50,7 @@ export class TicketFormPanelComponent {
               </div>
               <div class="min-w-0">
                 <h2 class="text-sm font-bold text-white truncate">Картка формування заявки WSN</h2>
-                <p class="text-[10px] sm:text-xs text-slate-400 truncate">Класифікація WSN 27994 / Обліковий запис WSN-SERVICE</p>
+                <p class="text-[10px] sm:text-xs text-slate-400 truncate">${uiConfig.CARD_SUBTITLE}</p>
               </div>
             </div>
 
@@ -72,30 +70,30 @@ export class TicketFormPanelComponent {
 
           <!-- Confidence Metrics Bar -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mt-1">
-            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.speechRecognition < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
+            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
               <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Розпізнавання</span>
-              <span class="font-bold ${confidence.speechRecognition < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
+              <span class="font-bold ${confidence.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.speechRecognition * 100).toFixed(0)}%
               </span>
             </div>
 
-            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.classification < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
+            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.classification < aiConfig.CONFIDENCE_THRESHOLD ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
               <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Класифікація</span>
-              <span class="font-bold ${confidence.classification < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
+              <span class="font-bold ${confidence.classification < aiConfig.CONFIDENCE_THRESHOLD ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.classification * 100).toFixed(0)}%
               </span>
             </div>
 
-            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.addressExtraction < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
+            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
               <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Адреса</span>
-              <span class="font-bold ${confidence.addressExtraction < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
+              <span class="font-bold ${confidence.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.addressExtraction * 100).toFixed(0)}%
               </span>
             </div>
 
-            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.geocoding < 0.7 ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
+            <div class="bg-slate-900 p-2 rounded-lg border ${confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD ? 'border-amber-500/60 bg-amber-950/20' : 'border-slate-800'}">
               <span class="text-slate-400 block text-[9px] sm:text-[10px] truncate">Геокодування</span>
-              <span class="font-bold ${confidence.geocoding < 0.7 ? 'text-amber-400' : 'text-emerald-400'}">
+              <span class="font-bold ${confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD ? 'text-amber-400' : 'text-emerald-400'}">
                 ${(confidence.geocoding * 100).toFixed(0)}%
               </span>
             </div>
@@ -117,7 +115,7 @@ export class TicketFormPanelComponent {
                 <div>
                   <h3 class="text-sm font-bold text-amber-300">Увага! Знайдено можливі дублікати WSN</h3>
                   <p class="text-xs text-amber-200/80 mt-0.5">
-                    Виявлено <strong>${duplicates.length}</strong> існуючих заявок класу 27772 за цією адресою/координатами:
+                    Виявлено <strong>${duplicates.length}</strong> існуючих заявок класу ${wsnConfig.CLASS_ID} за цією адресою/координатами:
                     <span class="font-mono underline font-semibold ml-1">${duplicates.map(d => escapeHtml(d.ticketId)).join(', ')}</span>
                   </p>
                 </div>
@@ -227,7 +225,7 @@ export class TicketFormPanelComponent {
               ${this.renderFormField({
                 label: 'Дата й час аварії (WSN 1258)',
                 fieldKey: 'incidentDateTime',
-                value: typeof formData.incidentDateTime === 'string' ? formData.incidentDateTime : formData.incidentDateTime.toISOString().slice(0, 16),
+                value: typeof formData.incidentDateTime === 'string' ? formData.incidentDateTime : formatDateTimeInput(formData.incidentDateTime),
                 type: 'datetime-local',
                 confidenceKey: 'speechRecognition',
                 confidenceScore: confidence.speechRecognition,
@@ -252,7 +250,7 @@ export class TicketFormPanelComponent {
               <div class="flex items-center justify-between gap-2">
                 <span class="text-[10px] text-slate-400 font-semibold">Джерело пошуку адрес:</span>
                 <div class="flex rounded-lg border border-slate-700 overflow-hidden text-[10px] font-semibold">
-                  ${(['auto', 'geodata', 'nominatim'] as const).map((provider) => `
+                  ${geoConfig.GEOCODING_PROVIDERS.map((provider) => `
                     <button type="button" data-geo-provider="${provider}" title="${providerButtons[provider].title}"
                       class="geo-provider-btn px-2.5 py-1.5 transition-all ${
                         provider === activeGeoProvider
@@ -282,7 +280,7 @@ export class TicketFormPanelComponent {
               fieldKey: 'coordinates',
               value: formData.coordinates,
               type: 'input',
-              placeholder: '50.4501, 30.5234 (широта, довгота)',
+              placeholder: `${geoConfig.DEFAULT_COORDINATES} (широта, довгота)`,
               confidenceKey: 'geocoding',
               confidenceScore: confidence.geocoding,
               isRequired: true
@@ -345,7 +343,7 @@ export class TicketFormPanelComponent {
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            Створити заявку (WSN Клас 27772 / Статус 5996)
+            Створити заявку (WSN Клас ${wsnConfig.CLASS_ID} / Статус ${wsnConfig.DEFAULT_STATUS_ID})
           </button>
         </div>
       </div>
@@ -355,17 +353,7 @@ export class TicketFormPanelComponent {
     this.scheduleAutoGeocode();
   }
 
-  private renderFormField(opts: {
-    label: string;
-    fieldKey: keyof WsnTicketData;
-    value: string;
-    type: 'input' | 'textarea' | 'select' | 'datetime-local';
-    options?: string[];
-    placeholder?: string;
-    confidenceKey: string;
-    confidenceScore: number;
-    isRequired: boolean;
-  }): string {
+  private renderFormField(opts: FormFieldDefinition): string {
     const isLowConfidence = this.store.isFieldLowConfidence(opts.fieldKey as keyof FieldVerificationStatus);
     const isVerified = this.store.getVerifications()[opts.fieldKey as keyof FieldVerificationStatus];
 
@@ -504,12 +492,12 @@ export class TicketFormPanelComponent {
         }
         this.geoSearchTimer = window.setTimeout(() => {
           const query = geoSearchInput.value.trim();
-          if (query.length >= 3) {
+          if (query.length >= uiConfig.GEO_SEARCH_MIN_CHARS) {
             this.handleAddressSearch(query);
           } else if (query.length === 0) {
             this.clearGeoResults();
           }
-        }, 500);
+        }, uiConfig.GEO_SEARCH_DEBOUNCE_MS);
       });
     }
 
@@ -532,7 +520,7 @@ export class TicketFormPanelComponent {
 
         this.clearGeoResults();
         const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
-        if (input && input.value.trim().length >= 3) {
+        if (input && input.value.trim().length >= uiConfig.GEO_SEARCH_MIN_CHARS) {
           this.handleAddressSearch(input.value);
         }
       });
@@ -592,7 +580,7 @@ export class TicketFormPanelComponent {
     if (this.autoGeoTimer) {
       window.clearTimeout(this.autoGeoTimer);
     }
-    this.autoGeoTimer = window.setTimeout(() => this.runAutoGeocode(address), 700);
+    this.autoGeoTimer = window.setTimeout(() => this.runAutoGeocode(address), uiConfig.AUTO_GEOCODE_DEBOUNCE_MS);
   }
 
   private async runAutoGeocode(address: string): Promise<void> {

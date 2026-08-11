@@ -1,6 +1,9 @@
 export { appConfig } from './app.config';
 export { authConfig } from './auth.config';
 export { aiConfig } from './ai.config';
+export { apiConfig } from './api.config';
 export { geoConfig } from './geo.config';
+export { nlpConfig } from './nlp.config';
 export { speechConfig } from './speech.config';
+export { uiConfig } from './ui.config';
 export { wsnConfig } from './wsn.config';

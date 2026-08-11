@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { ClarificationMode } from '../types/ticket';
 import { escapeHtml } from '../utils/security';
-import { appConfig } from '../config';
+import { appConfig, speechConfig, uiConfig } from '../config';
 import { GeminiService } from '../services/GeminiService';
 import { VoiceDictationService } from '../services/VoiceDictationService';
 
@@ -137,7 +137,7 @@ export class TranscriptPanelComponent {
 
             <!-- Animated Audio Wavebar -->
             <div id="audio-waveform-container" class="flex-1 flex items-center gap-1 h-8 px-2 overflow-hidden" aria-hidden="true">
-              ${Array.from({ length: 32 }).map((_, i) => `
+              ${Array.from({ length: uiConfig.WAVE_BAR_COUNT }).map((_, i) => `
                 <div class="w-1 bg-sky-400/80 rounded-full transition-all duration-300 h-2 opacity-40 wave-bar" style="animation-delay: ${(i * 0.05).toFixed(2)}s;"></div>
               `).join('')}
             </div>
@@ -431,7 +431,7 @@ export class TranscriptPanelComponent {
       };
 
       this.mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(this.audioChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
+        const audioBlob = new Blob(this.audioChunks, { type: this.mediaRecorder?.mimeType || speechConfig.DEFAULT_AUDIO_MIME_TYPE });
         stream.getTracks().forEach(track => track.stop());
         await this.processAudioBlob(audioBlob, this.currentSpokenText);
       };

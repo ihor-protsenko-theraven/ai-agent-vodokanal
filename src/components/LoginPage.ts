@@ -1,5 +1,5 @@
 import { TicketStateStore } from '../services/TicketStateStore';
-import { appConfig, authConfig } from '../config';
+import { appConfig, authConfig, uiConfig } from '../config';
 import { escapeHtml } from '../utils/security';
 
 export class LoginPageComponent {
@@ -134,7 +134,7 @@ export class LoginPageComponent {
 
         const success = await this.store.login(userInput, passInput);
         if (!success) {
-          this.errorMessage = `Невірне ім'я користувача або пароль. Використовуйте ${authConfig.DEFAULT_ADMIN_USER} / ${authConfig.DEFAULT_ADMIN_PASS}.`;
+          this.errorMessage = uiConfig.LOGIN_ERROR_MESSAGE(authConfig.DEFAULT_ADMIN_USER, authConfig.DEFAULT_ADMIN_PASS);
           this.render();
         }
       });
