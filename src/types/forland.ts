@@ -49,6 +49,20 @@ export interface GetListItem {
 
 export type GetListResponse = GetListItem[];
 
+/**
+ * Minimal representation of an active ticket used by the dispatcher list and
+ * duplicate check. GetList returns many more Init.Properties, which are not
+ * retained in browser state.
+ */
+export interface UnclosedTicketSummary {
+  id: number;
+  title: string;
+  addressText: string;
+  coordinates: string;
+  logId?: string | number;
+  metaId?: number;
+}
+
 export interface CreateNewUnitRequest {
   KindUnitID: number;
 }
@@ -89,6 +103,7 @@ export interface SaveRequest {
 }
 
 export interface SaveResponse {
+  transportStatus?: number;
   success?: boolean;
   ID?: number;
   error?: string;

@@ -1,14 +1,6 @@
 /**
- * Shared WSN utilities: ticket IDs and local datetime formatting.
+ * Shared WSN utilities for IDs and local datetime formatting.
  */
-
-export function generateWsnTicketId(
-  classId: number,
-  statusId: number,
-  suffix: string = String(Math.floor(1000 + Math.random() * 9000))
-): string {
-  return `WSN-${classId}-${statusId}-${suffix}`;
-}
 
 export function generateCallId(prefix: string): string {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -17,11 +9,17 @@ export function generateCallId(prefix: string): string {
 }
 
 export function formatDateTimeLocal(date: Date): string {
-  return date.toISOString().slice(0, 16).replace('T', ' ');
+  return formatDateTimeInput(date).replace('T', ' ');
 }
 
 export function formatDateTimeInput(date: Date): string {
-  return date.toISOString().slice(0, 16);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 /**
@@ -90,14 +88,13 @@ export function formatForlandDateTimeWithTimezone(date: Date): string {
   
   const offsetString = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMinutes).padStart(2, '0')}`;
   
-  const isoString = date.toISOString();
-  const parts = isoString.split('.');
-  
-  if (parts.length === 2) {
-    const milliseconds = parts[1].replace('Z', '');
-    const paddedMs = milliseconds.padEnd(7, '0').slice(0, 7);
-    return `${parts[0]}.${paddedMs}${offsetString}`;
-  }
-  
-  return isoString.replace('Z', '.0000000') + offsetString;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const fractionalSeconds = String(date.getMilliseconds()).padStart(3, '0').padEnd(7, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${fractionalSeconds}${offsetString}`;
 }

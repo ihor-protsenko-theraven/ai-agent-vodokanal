@@ -3,7 +3,7 @@
  * Handles authentication and repository data retrieval from Forland API
  *
  * Requests go through a same-origin proxy to avoid CORS:
- * - Dev:  Vite dev server proxy (/forland -> https://zhytomyr.forland-solution.com)
+ * - Dev:  Vite dev server proxy (/forland -> https://wsn1.forland-solution.com)
  * - Prod: Vercel serverless function (/api/forland)
  */
 
@@ -17,9 +17,11 @@ import {
   RepositoryResponse,
   SaveRequest,
   SaveResponse,
+  UnclosedTicketSummary,
   Unit,
   ValueItem
 } from '../types';
+import { toUnclosedTicketSummary } from './forlandTicketSummary';
 
 class ForlandApiService {
   private baseUrl: string = import.meta.env.DEV ? '/forland' : '/api/forland';
@@ -181,7 +183,7 @@ class ForlandApiService {
    * Get all unclosed tickets by kindUnitID with multiple stateIDs.
    * This helps to avoid duplicates by checking all active ticket states.
    */
-  async getUnclosedTickets(kindUnitID: number, stateIDs: number[]): Promise<ValueItem[] | null> {
+  async getUnclosedTickets(kindUnitID: number, stateIDs: readonly number[]): Promise<UnclosedTicketSummary[] | null> {
     try {
       const query = new URLSearchParams();
       query.set('kindUnitID', String(kindUnitID));
@@ -206,11 +208,8 @@ class ForlandApiService {
       }
 
       return (data as GetListResponse)
-        .filter((item) => item && item.ID != null && item.Title)
-        .map((item) => ({
-          ID: item.ID,
-          Value: String(item.Title).trim()
-        }));
+        .filter((item) => item && item.ID != null)
+        .map(toUnclosedTicketSummary);
     } catch (error) {
       console.error('GetUnclosedTickets error:', error);
       return null;
@@ -264,8 +263,8 @@ class ForlandApiService {
         return null;
       }
 
-      const data = await response.json();
-      return data as SaveResponse;
+      const data = await response.json() as SaveResponse;
+      return { ...data, transportStatus: response.status };
     } catch (error) {
       console.error('SaveTicket error:', error);
       return null;
@@ -290,6 +289,7 @@ export type {
   RepositoryResponse, 
   SaveRequest, 
   SaveResponse, 
+  UnclosedTicketSummary,
   Unit, 
   ValueItem 
 };

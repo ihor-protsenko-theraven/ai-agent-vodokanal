@@ -29,22 +29,26 @@ export class GeminiService {
   }
 
   public async processAudio(audioBlob: Blob, spokenText?: string): Promise<AgentProcessingResult> {
+    if (aiConfig.MODE === 'local') {
+      console.info('[Local AI] Gemini API is disabled; using the local parser or mock data.');
+      return this.executeLocalFallback(spokenText);
+    }
+
     const hasText = Boolean(spokenText?.trim());
     const hasAudio = audioBlob.size > 0;
 
     let rawJson: string | null = null;
 
-    if (aiConfig.GEMINI_API_KEY) {
-      // Scenario 1: Multimodal (Audio + Text)
-      if (hasAudio) {
-        rawJson = await this.executeGeminiChain(await this.buildMultimodalPayload(audioBlob, spokenText));
-      }
+    // Scenario 1: Multimodal (Audio + Text) through the server-side proxy.
+    // The Gemini API key must never be present in a browser bundle.
+    if (hasAudio) {
+      rawJson = await this.executeGeminiChain(await this.buildMultimodalPayload(audioBlob, spokenText));
+    }
 
-      // Scenario 2: Text-only fallback
-      if (!rawJson && hasText) {
-        console.warn('[Gemini] Switching to text-only fallback chain.');
-        rawJson = await this.executeGeminiChain(this.buildTextPayload(spokenText!));
-      }
+    // Scenario 2: Text-only fallback
+    if (!rawJson && hasText) {
+      console.warn('[Gemini] Switching to text-only fallback chain.');
+      rawJson = await this.executeGeminiChain(this.buildTextPayload(spokenText!));
     }
 
     // Scenario 3: Local parsing fallback
@@ -64,19 +68,12 @@ export class GeminiService {
 
     for (const modelName of candidateModels) {
       try {
-        const apiUrl =
-          `${apiConfig.GEMINI.BASE_URL}/models/${modelName}:generateContent` +
-          `?key=${aiConfig.GEMINI_API_KEY}`;
-
-        const res = await fetch(apiUrl, {
+        const res = await fetch(apiConfig.GEMINI.PROXY_PATH, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: aiConfig.GEMINI_TEMPERATURE
-            }
+            model: modelName,
+            parts
           })
         });
 

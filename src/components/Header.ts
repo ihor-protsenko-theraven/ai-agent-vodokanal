@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { MOCK_SCENARIOS } from '../mock/mockData';
 import { escapeHtml } from '../utils/security';
-import { appConfig, wsnConfig } from '../config';
+import { aiConfig, appConfig, wsnConfig } from '../config';
 
 export class HeaderComponent {
   private store: TicketStateStore;
@@ -16,6 +16,9 @@ export class HeaderComponent {
     const result = this.store.getResult();
     const activeScenarioId = this.store.getActiveScenarioId();
     const isIntercepted = this.store.getCallIntercepted();
+    const isPreparingNewTicket = this.store.getIsPreparingNewTicket();
+    const unclosedTicketsCount = this.store.getUnclosedTickets().length;
+    const isUnclosedTicketsPanelOpen = this.store.getIsUnclosedTicketsPanelOpen();
     const currentUser = this.store.getCurrentUser();
 
     this.container.innerHTML = `
@@ -31,6 +34,7 @@ export class HeaderComponent {
             <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <h1 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-wide leading-tight">${appConfig.TITLE}</h1>
               <span class="bg-sky-500/20 text-sky-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-sky-500/30 shrink-0">${appConfig.VERSION_LABEL}</span>
+              ${aiConfig.MODE === 'local' ? '<span class="bg-amber-500/15 text-amber-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-amber-500/30 shrink-0">Локальний AI</span>' : ''}
             </div>
             <p class="text-[9px] sm:text-[10px] md:text-xs text-slate-400 truncate max-w-[160px] sm:max-w-[200px] md:max-w-none">${appConfig.SUBTITLE}</p>
           </div>
@@ -38,6 +42,13 @@ export class HeaderComponent {
 
         <!-- Scenario Switcher & Logout Button -->
         <div class="flex items-center gap-2 md:gap-3 order-2 xl:order-3 shrink-0 ml-auto">
+          <button id="btn-new-ticket" ${isPreparingNewTicket ? 'disabled' : ''} class="py-1 px-1.5 sm:py-1.5 sm:px-2 md:py-2 md:px-3 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-400 text-white text-[10px] md:text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:cursor-wait shrink-0">
+            <span>${isPreparingNewTicket ? 'Підготовка…' : 'Нова заявка'}</span>
+          </button>
+          <button id="btn-unclosed-tickets" aria-expanded="${isUnclosedTicketsPanelOpen}" class="py-1 px-1.5 sm:py-1.5 sm:px-2 md:py-2 md:px-3 ${isUnclosedTicketsPanelOpen ? 'bg-sky-500/20 border-sky-500/60 text-sky-200' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'} border text-[10px] md:text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shrink-0">
+            <span>Незакриті</span>
+            ${unclosedTicketsCount > 0 ? `<span class="min-w-4 px-1 rounded bg-slate-950/70 text-sky-300 font-mono">${unclosedTicketsCount}</span>` : ''}
+          </button>
           <div class="flex items-center gap-1.5 sm:gap-2">
             <label for="scenario-select" class="text-[10px] md:text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">Сценарій ТЗ:</label>
             <select id="scenario-select" class="bg-slate-800 text-slate-200 text-[10px] sm:text-xs rounded-lg border border-slate-700 px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 md:py-2 max-w-[90px] sm:max-w-[140px] md:max-w-xs focus:ring-2 focus:ring-sky-500 focus:outline-none cursor-pointer truncate">
@@ -98,6 +109,21 @@ export class HeaderComponent {
         const val = (e.target as HTMLSelectElement).value;
         this.store.loadScenario(val);
       });
+    }
+
+    const newTicketButton = this.container.querySelector<HTMLButtonElement>('#btn-new-ticket');
+    if (newTicketButton) {
+      newTicketButton.addEventListener('click', async () => {
+        const created = await this.store.createNewTicket();
+        if (!created) {
+          alert('Не вдалося підготувати шаблон нової заявки. Перевірте підключення до Forland.');
+        }
+      });
+    }
+
+    const unclosedTicketsButton = this.container.querySelector<HTMLButtonElement>('#btn-unclosed-tickets');
+    if (unclosedTicketsButton) {
+      unclosedTicketsButton.addEventListener('click', () => void this.store.toggleUnclosedTicketsPanel());
     }
 
     const btnLogout = this.container.querySelector('#btn-logout');

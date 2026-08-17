@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
-import { wsnConfig, uiConfig } from '../config';
+import { wsnConfig } from '../config';
 
 export class DuplicateModalComponent {
   private store: TicketStateStore;
@@ -33,8 +33,8 @@ export class DuplicateModalComponent {
                 </svg>
               </div>
               <div>
-                <h3 class="text-base font-bold text-white">Знайдено дублікат заявки у WSN</h3>
-                <p class="text-xs text-slate-400">Перегляд існуючої заявки класу ${wsnConfig.CLASS_ID}</p>
+                <h3 class="text-base font-bold text-white">Можливий дублікат заявки у WSN</h3>
+                <p class="text-xs text-slate-400">Адреса або координати чернетки консервативно збігаються з активною заявкою класу ${wsnConfig.CLASS_ID}</p>
               </div>
             </div>
 
@@ -50,15 +50,14 @@ export class DuplicateModalComponent {
             <!-- Left: Existing Ticket -->
             <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-3">
               <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span class="font-bold text-amber-400">Існуюча заявка WSN</span>
+                <span class="font-bold text-amber-400">Кандидат із WSN</span>
                 <span class="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono text-[10px]">${escapeHtml(dup.ticketId)}</span>
               </div>
               <div class="space-y-1.5 text-slate-300">
-                <p><strong class="text-slate-400">Причина збігу:</strong> <span class="text-amber-300 font-semibold">${escapeHtml(dup.matchReason)}</span></p>
-                <p><strong class="text-slate-400">Статус:</strong> <span class="text-sky-300">${escapeHtml(dup.status || uiConfig.DEFAULT_STATUS_LABEL(wsnConfig.DEFAULT_STATUS_ID, wsnConfig.DEFAULT_STATUS_NAME))}</span></p>
-                <p><strong class="text-slate-400">Створено:</strong> ${escapeHtml(dup.createdDate || 'Сьогодні')}</p>
-                <p><strong class="text-slate-400">Адреса:</strong> ${escapeHtml(dup.addressText || currentForm.addressText)}</p>
-                <p><strong class="text-slate-400">Тип:</strong> ${escapeHtml(dup.appealType || currentForm.appealType)}</p>
+                <p><strong class="text-slate-400">Причина:</strong> <span class="text-amber-300 font-semibold">${escapeHtml(dup.matchReason === 'COORDINATES_MATCH' ? 'збіг координат' : 'збіг адреси')}</span></p>
+                <p><strong class="text-slate-400">Назва WSN:</strong> ${escapeHtml(dup.ticketTitle || 'Не надано API')}</p>
+                <p><strong class="text-slate-400">Адреса:</strong> ${escapeHtml(dup.addressText || 'Дані відсутні')}</p>
+                <p><strong class="text-slate-400">Координати:</strong> <span class="font-mono text-emerald-300">${escapeHtml(dup.coordinates || 'Дані відсутні')}</span></p>
               </div>
             </div>
 
@@ -84,8 +83,8 @@ export class DuplicateModalComponent {
               Продовжити редагування чернетки
             </button>
 
-            <button id="btn-open-in-wsn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition-all shadow-md">
-              Приєднати до існуючої заявки (${escapeHtml(dup.ticketId)})
+            <button disabled title="Для цієї операції потрібен підтверджений Forland API read/update контракт" class="px-4 py-2 bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">
+              Приєднання потребує окремого UI (${escapeHtml(dup.ticketId)})
             </button>
           </div>
         </div>
@@ -98,17 +97,10 @@ export class DuplicateModalComponent {
   private attachEvents(): void {
     const closeBtn = this.container.querySelector('#btn-close-dup-modal');
     const cancelBtn = this.container.querySelector('#btn-cancel-dup-modal');
-    const openInWsnBtn = this.container.querySelector('#btn-open-in-wsn');
 
     const closeModal = () => this.store.setSelectedDuplicate(null);
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-    if (openInWsnBtn) {
-      openInWsnBtn.addEventListener('click', () => {
-        alert(`Перехід до картки існуючої заявки WSN: ${this.store.getSelectedDuplicate()?.ticketId}`);
-        closeModal();
-      });
-    }
   }
 }

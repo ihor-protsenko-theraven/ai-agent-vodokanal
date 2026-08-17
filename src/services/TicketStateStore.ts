@@ -3,6 +3,7 @@ import {
   ClarificationMode,
   FieldVerificationStatus,
   TicketDuplicate,
+  UnclosedTicketSummary,
   UserSession,
   WsnTicketData
 } from '../types';
@@ -11,7 +12,16 @@ import { authConfig, aiConfig, wsnConfig, uiConfig } from '../config';
 import { forlandApiService } from './ForlandApiService';
 import { dropdownDataService } from './DropdownDataService';
 import { DuplicateFinder } from './DuplicateFinder';
-import { formatDateTimeInput, formatForlandDateTimeMinutePrecision, formatForlandDateTimeMinutePrecisionWithTimezone } from '../utils/wsn';
+import { isSaveSuccessful } from './saveResult';
+import { CreateNewUnitResponse } from '../types';
+import { formatForlandDateTimeMinutePrecision, formatForlandDateTimeMinutePrecisionWithTimezone } from '../utils/wsn';
+import {
+  createEmptyTicketResult,
+  getInitialVerifications,
+  getTicketValidationErrors,
+  isLowConfidenceField,
+  toTicketFormData
+} from './ticketDraft';
 
 export type StateChangeListener = () => void;
 
@@ -27,8 +37,18 @@ export class TicketStateStore {
   private isCallIntercepted: boolean = false;
   private selectedDuplicate: TicketDuplicate | null = null;
   private isSubmitted: boolean = false;
+  private submittedTicketId: number | null = null;
+  private newTicketTemplate: CreateNewUnitResponse | null = null;
+  private isPreparingNewTicket: boolean = false;
+  private isCheckingDuplicates: boolean = false;
   private isProcessingAudio: boolean = false;
   private activeScenarioId: string = aiConfig.SCENARIOS.LOW_CONFIDENCE;
+  private unclosedTickets: UnclosedTicketSummary[] = [];
+  private unclosedTicketsUpdatedAt: Date | null = null;
+  private unclosedTicketsError: string | null = null;
+  private isLoadingUnclosedTickets: boolean = false;
+  private isUnclosedTicketsPanelOpen: boolean = false;
+  private unclosedTicketsRequest: Promise<boolean> | null = null;
 
   private duplicateFinder = new DuplicateFinder();
 
@@ -36,8 +56,8 @@ export class TicketStateStore {
 
   private constructor() {
     this.result = { ...SCENARIO_LOW_CONFIDENCE };
-    this.formData = this.extractTicketData(this.result.ticket);
-    this.verifications = this.initVerifications(this.result);
+    this.formData = toTicketFormData(this.result.ticket);
+    this.verifications = getInitialVerifications(this.result);
     this.restoreSession();
   }
 
@@ -68,47 +88,19 @@ export class TicketStateStore {
     this.listeners.forEach(listener => listener());
   }
 
-  private extractTicketData(ticketPartial: Partial<WsnTicketData>): WsnTicketData {
-    return {
-      appealType: ticketPartial.appealType || '',
-      ticketType: ticketPartial.ticketType || '',
-      applicantName: ticketPartial.applicantName || '',
-      applicantAddress: ticketPartial.applicantAddress || '',
-      addressText: ticketPartial.addressText || '',
-      coordinates: ticketPartial.coordinates || '',
-      phoneNumber: ticketPartial.phoneNumber || '',
-      incidentDateTime: ticketPartial.incidentDateTime || formatDateTimeInput(new Date()),
-      notes: ticketPartial.notes || ''
-    };
-  }
-
-  private initVerifications(result: AgentProcessingResult): FieldVerificationStatus {
-    const isGlobalReview = result.requiresManualReview;
-    const lowClassification = result.confidence.classification < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowAddress = result.confidence.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowGeo = result.confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
-    const lowSpeech = result.confidence.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD || isGlobalReview;
-
-    return {
-      appealType: !lowClassification,
-      ticketType: !lowClassification,
-      addressText: !lowAddress,
-      coordinates: !lowGeo,
-      notes: !lowSpeech
-    };
-  }
-
   public loadScenario(scenarioId: string): void {
     const found = MOCK_SCENARIOS.find(s => s.id === scenarioId);
     if (found) {
       this.activeScenarioId = scenarioId;
       this.result = JSON.parse(JSON.stringify(found.data));
-      this.formData = this.extractTicketData(this.result.ticket);
-      this.verifications = this.initVerifications(this.result);
+      this.formData = toTicketFormData(this.result.ticket);
+      this.verifications = getInitialVerifications(this.result);
       this.forceRegistrationUnlocked = false;
       this.isCallIntercepted = false;
       this.selectedDuplicate = null;
       this.isSubmitted = false;
+      this.submittedTicketId = null;
+      this.newTicketTemplate = null;
       this.notify();
     }
   }
@@ -122,63 +114,43 @@ export class TicketStateStore {
     this.activeScenarioId = aiConfig.SCENARIOS.REAL_AUDIO;
     this.isProcessingAudio = false;
     this.result = realResult;
+    this.formData = toTicketFormData(this.result.ticket);
 
-    // Automated duplicate check against WSN database using real API
-    if ((!this.result.duplicatesFound || this.result.duplicatesFound.length === 0) && this.result.requiresTicketRegistration) {
-      try {
-        const found = await this.duplicateFinder.findRealDuplicates({
-          addressText: this.result.ticket.addressText || '',
-          searchText: this.result.ticket.addressText || '',
-          appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
-        });
-        if (found.length > 0) {
-          this.result.duplicatesFound = found;
-        }
-      } catch (error) {
-        console.error('Error in real duplicate check, falling back to local:', error);
-        // Fallback to local detection if API fails
-        const found = this.duplicateFinder.find({
-          addressText: this.result.ticket.addressText || '',
-          searchText: this.result.ticket.addressText || '',
-          appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
-        });
-        if (found.length > 0) {
-          this.result.duplicatesFound = found;
-        }
-      }
+    // Always replace model/local duplicate hints with the authenticated Forland
+    // check. A failed check must never fabricate a duplicate ticket.
+    this.result.duplicatesFound = [];
+    if (this.result.requiresTicketRegistration) {
+      await this.checkDuplicates(false);
     }
 
-    this.formData = this.extractTicketData(this.result.ticket);
-    this.verifications = this.initVerifications(this.result);
+    this.verifications = getInitialVerifications(this.result);
     this.forceRegistrationUnlocked = false;
     this.isCallIntercepted = false;
     this.selectedDuplicate = null;
     this.isSubmitted = false;
+    this.submittedTicketId = null;
+    this.newTicketTemplate = null;
     this.notify();
   }
 
   // Getters
   public async login(username: string, password: string): Promise<boolean> {
-    const user = username.trim().toLowerCase();
+    const user = username.trim();
     const pass = password.trim();
 
-    // Try Forland API login first
-    const forlandLoginSuccess = await forlandApiService.login(
-      authConfig.DEFAULT_ADMIN_USER,
-      authConfig.DEFAULT_ADMIN_PASS
-    );
+    if (!user || !pass) {
+      return false;
+    }
 
-    // Fallback to local auth if Forland fails or for testing
-    const localAuthSuccess =
-      (user === authConfig.DEFAULT_ADMIN_USER && pass === authConfig.DEFAULT_ADMIN_PASS) ||
-      (user === authConfig.DEFAULT_OPERATOR_USER && pass === authConfig.DEFAULT_ADMIN_PASS);
+    // Authenticate exactly as the operator entered. There is intentionally no
+    // client-side fallback account: the Forland session is the source of truth.
+    const forlandLoginSuccess = await forlandApiService.login(user, pass);
 
-    if (forlandLoginSuccess || localAuthSuccess) {
-      const isAdmin = user === authConfig.DEFAULT_ADMIN_USER;
+    if (forlandLoginSuccess) {
       this.currentUser = {
         username: user,
-        displayName: isAdmin ? authConfig.ADMIN_DISPLAY_NAME : authConfig.OPERATOR_DISPLAY_NAME,
-        role: isAdmin ? authConfig.ADMIN_ROLE : authConfig.OPERATOR_ROLE,
+        displayName: user,
+        role: authConfig.AUTHENTICATED_ROLE,
         operatorId: wsnConfig.OPERATOR_ID
       };
       try {
@@ -201,6 +173,10 @@ export class TicketStateStore {
     await forlandApiService.logout();
 
     this.currentUser = null;
+    this.unclosedTickets = [];
+    this.unclosedTicketsUpdatedAt = null;
+    this.unclosedTicketsError = null;
+    this.isUnclosedTicketsPanelOpen = false;
     try {
       sessionStorage.removeItem(authConfig.STORAGE_KEY);
     } catch {
@@ -249,18 +225,180 @@ export class TicketStateStore {
     return this.isSubmitted;
   }
 
+  public getSubmittedTicketId(): number | null {
+    return this.submittedTicketId;
+  }
+
   public getIsProcessingAudio(): boolean {
     return this.isProcessingAudio;
+  }
+
+  public getIsPreparingNewTicket(): boolean {
+    return this.isPreparingNewTicket;
+  }
+
+  public getIsCheckingDuplicates(): boolean {
+    return this.isCheckingDuplicates;
+  }
+
+  public getUnclosedTickets(): readonly UnclosedTicketSummary[] {
+    return this.unclosedTickets;
+  }
+
+  public getUnclosedTicketsUpdatedAt(): Date | null {
+    return this.unclosedTicketsUpdatedAt;
+  }
+
+  public getUnclosedTicketsError(): string | null {
+    return this.unclosedTicketsError;
+  }
+
+  public getIsLoadingUnclosedTickets(): boolean {
+    return this.isLoadingUnclosedTickets;
+  }
+
+  public getIsUnclosedTicketsPanelOpen(): boolean {
+    return this.isUnclosedTicketsPanelOpen;
   }
 
   public getActiveScenarioId(): string {
     return this.activeScenarioId;
   }
 
-  // Setters & Actions
-  public updateFormField<K extends keyof WsnTicketData>(field: K, value: WsnTicketData[K]): void {
-    this.formData[field] = value;
+  public async toggleUnclosedTicketsPanel(): Promise<void> {
+    this.isUnclosedTicketsPanelOpen = !this.isUnclosedTicketsPanelOpen;
     this.notify();
+
+    if (this.isUnclosedTicketsPanelOpen && this.unclosedTicketsUpdatedAt === null) {
+      await this.refreshUnclosedTickets();
+    }
+  }
+
+  public async refreshUnclosedTickets(notify: boolean = true): Promise<boolean> {
+    if (this.unclosedTicketsRequest) {
+      return this.unclosedTicketsRequest;
+    }
+
+    const request = (async () => {
+      this.isLoadingUnclosedTickets = true;
+      this.unclosedTicketsError = null;
+      if (notify) {
+        this.notify();
+      }
+
+      try {
+        const tickets = await forlandApiService.getUnclosedTickets(
+          wsnConfig.CLASS_ID,
+          wsnConfig.UNCLOSED_STATE_IDS
+        );
+        if (tickets === null) {
+          throw new Error('Forland did not return unclosed tickets');
+        }
+
+        this.unclosedTickets = tickets;
+        this.unclosedTicketsUpdatedAt = new Date();
+        return true;
+      } catch (error) {
+        console.error('Unable to load unclosed tickets from Forland:', error);
+        this.unclosedTicketsError = 'Не вдалося завантажити незакриті заявки з Forland.';
+        return false;
+      } finally {
+        this.isLoadingUnclosedTickets = false;
+        if (notify) {
+          this.notify();
+        }
+      }
+    })();
+
+    this.unclosedTicketsRequest = request;
+    try {
+      return await request;
+    } finally {
+      this.unclosedTicketsRequest = null;
+    }
+  }
+
+  public async createNewTicket(): Promise<boolean> {
+    if (this.isPreparingNewTicket) {
+      return false;
+    }
+
+    this.isPreparingNewTicket = true;
+    this.notify();
+
+    try {
+      const template = await forlandApiService.createNewUnit(wsnConfig.CLASS_ID);
+      if (!template) {
+        return false;
+      }
+
+      this.newTicketTemplate = template;
+      this.activeScenarioId = aiConfig.SCENARIOS.REAL_AUDIO;
+      this.result = createEmptyTicketResult();
+      this.formData = toTicketFormData(this.result.ticket);
+      this.verifications = getInitialVerifications(this.result);
+      this.forceRegistrationUnlocked = false;
+      this.isCallIntercepted = false;
+      this.selectedDuplicate = null;
+      this.isSubmitted = false;
+      this.submittedTicketId = null;
+      return true;
+    } catch (error) {
+      console.error('Failed to prepare a new Forland ticket:', error);
+      return false;
+    } finally {
+      this.isPreparingNewTicket = false;
+      this.notify();
+    }
+  }
+
+  // Setters & Actions
+  public updateFormField<K extends keyof WsnTicketData>(field: K, value: WsnTicketData[K], notify: boolean = true): void {
+    this.formData[field] = value;
+    if (field === 'addressText') {
+      this.result.duplicatesFound = [];
+      this.result.duplicateCheckStatus = String(value).trim() ? 'REQUIRED' : undefined;
+    }
+    if (notify) {
+      this.notify();
+    }
+  }
+
+  public async checkDuplicates(notify: boolean = true): Promise<boolean> {
+    if (!this.result.requiresTicketRegistration || !this.formData.addressText.trim()) {
+      return true;
+    }
+
+    this.isCheckingDuplicates = true;
+    this.result.duplicatesFound = [];
+    if (notify) {
+      this.notify();
+    }
+
+    try {
+      const listLoaded = await this.refreshUnclosedTickets(notify);
+      if (!listLoaded) {
+        throw new Error('Forland did not return unclosed tickets');
+      }
+
+      this.result.duplicatesFound = this.duplicateFinder.findPotentialDuplicates({
+        addressText: this.formData.addressText,
+        coordinates: this.formData.coordinates,
+        searchText: this.formData.addressText,
+        appealType: this.formData.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
+      }, this.unclosedTickets);
+      this.result.duplicateCheckStatus = 'COMPLETED';
+      return true;
+    } catch (error) {
+      console.error('Duplicate check against Forland is unavailable:', error);
+      this.result.duplicateCheckStatus = 'UNAVAILABLE';
+      return false;
+    } finally {
+      this.isCheckingDuplicates = false;
+      if (notify) {
+        this.notify();
+      }
+    }
   }
 
   public toggleVerification(field: keyof FieldVerificationStatus): void {
@@ -299,73 +437,21 @@ export class TicketStateStore {
 
   // Confidence low check helpers
   public isFieldLowConfidence(field: keyof FieldVerificationStatus): boolean {
-    const conf = this.result.confidence;
-    const isGlobal = this.result.requiresManualReview;
-
-    switch (field) {
-      case 'appealType':
-      case 'ticketType':
-        return conf.classification < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
-      case 'addressText':
-        return conf.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
-      case 'coordinates':
-        return conf.geocoding < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
-      case 'notes':
-        return conf.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD || isGlobal;
-      default:
-        return false;
-    }
+    return isLowConfidenceField(this.result, field);
   }
 
   // Validation rules (Requirement 4)
   public isValid(): boolean {
-    // 1. Mandatory fields notes (328) and coordinates (-420) must be filled out
-    if (!this.formData.notes || !this.formData.notes.trim()) {
-      return false;
-    }
-    if (!this.formData.coordinates || !this.formData.coordinates.trim()) {
-      return false;
-    }
-
-    // 2. Unverified fields with low confidence must be verified (checkbox checked)
-    const fieldsToVerify: (keyof FieldVerificationStatus)[] = ['appealType', 'ticketType', 'addressText', 'coordinates', 'notes'];
-    for (const field of fieldsToVerify) {
-      if (this.isFieldLowConfidence(field) && !this.verifications[field]) {
-        return false;
-      }
-    }
-
-    // 3. Requires ticket registration check (must be true or force unlocked)
-    if (!this.result.requiresTicketRegistration && !this.forceRegistrationUnlocked) {
-      return false;
-    }
-
-    return true;
+    return this.getValidationErrors().length === 0;
   }
 
   public getValidationErrors(): string[] {
-    const errors: string[] = [];
-
-    if (!this.formData.coordinates || !this.formData.coordinates.trim()) {
-      errors.push(`Обов\'язкове поле "${wsnConfig.FIELD_LABELS.coordinates}" не заповнене`);
-    }
-    if (!this.formData.notes || !this.formData.notes.trim()) {
-      errors.push(`Обов\'язкове поле "${wsnConfig.FIELD_LABELS.notes}" не заповнене`);
-    }
-
-    const fieldsToVerify: (keyof FieldVerificationStatus)[] = ['appealType', 'ticketType', 'addressText', 'coordinates', 'notes'];
-
-    for (const field of fieldsToVerify) {
-      if (this.isFieldLowConfidence(field) && !this.verifications[field]) {
-        errors.push(`Не підтверджено поле з низькою впевненістю: "${wsnConfig.FIELD_LABELS[field]}"`);
-      }
-    }
-
-    if (!this.result.requiresTicketRegistration && !this.forceRegistrationUnlocked) {
-      errors.push('Звернення не потребує створення заявки (натисніть "Створити примусово" для розблокування)');
-    }
-
-    return errors;
+    return getTicketValidationErrors({
+      formData: this.formData,
+      result: this.result,
+      verifications: this.verifications,
+      forceRegistrationUnlocked: this.forceRegistrationUnlocked
+    });
   }
 
   public async submitTicket(): Promise<boolean> {
@@ -374,8 +460,9 @@ export class TicketStateStore {
     }
 
     try {
-      // 1. Get new ticket template from Forland
-      const template = await forlandApiService.createNewUnit(wsnConfig.CLASS_ID);
+      // 1. Reuse the template prepared for an explicit "new ticket" flow.
+      // Audio-originated tickets still obtain a template lazily at submit time.
+      const template = this.newTicketTemplate ?? await forlandApiService.createNewUnit(wsnConfig.CLASS_ID);
       
       if (!template) {
         console.error('Failed to create new unit template');
@@ -390,9 +477,6 @@ export class TicketStateStore {
       const appealTypeId = dropdownDataService.getAppealTypeId(this.formData.appealType);
       const ticketTypeId = dropdownDataService.getTicketTypeId(this.formData.ticketType);
 
-      console.log('Form data appeal type:', this.formData.appealType, 'ID:', appealTypeId);
-      console.log('Form data ticket type:', this.formData.ticketType, 'ID:', ticketTypeId);
-      
       // Use ID for both appeal type and ticket type
       const appealTypeValue = appealTypeId ?? this.formData.appealType;
       const ticketTypeValue = ticketTypeId ?? this.formData.ticketType;
@@ -438,7 +522,12 @@ export class TicketStateStore {
       };
 
       // Ensure Init arrays are preserved (they are required)
-      const initArrays = ['f1268', 'f1954', 'f1974', 'f_221'];
+      const initArrays = [
+        wsnConfig.PROPERTIES.INIT_FIELD_1268,
+        wsnConfig.PROPERTIES.INIT_FIELD_1954,
+        wsnConfig.PROPERTIES.INIT_FIELD_1974,
+        wsnConfig.PROPERTIES.INIT_FIELD_221
+      ];
       for (const arrayField of initArrays) {
         if (templateInitProperties[arrayField] !== undefined) {
           mergedProperties[arrayField] = templateInitProperties[arrayField];
@@ -449,26 +538,26 @@ export class TicketStateStore {
       }
 
       // Override system date fields with current data (use minute precision)
-      mergedProperties['f1258'] = formatForlandDateTimeMinutePrecision(new Date()); // Current time for f1258
-      mergedProperties['f_297'] = formatForlandDateTimeMinutePrecisionWithTimezone(new Date()); // Document date with timezone
+      mergedProperties[wsnConfig.PROPERTIES.INCIDENT_DATE_TIME] = formatForlandDateTimeMinutePrecision(new Date());
+      mergedProperties[wsnConfig.PROPERTIES.DOCUMENT_DATE] = formatForlandDateTimeMinutePrecisionWithTimezone(new Date());
       
       // Ensure f_296 (autofill) is preserved from template
-      if (templateEditProperties['f_296']) {
-        mergedProperties['f_296'] = templateEditProperties['f_296'];
+      if (templateEditProperties[wsnConfig.PROPERTIES.AUTOFILL_FIELD]) {
+        mergedProperties[wsnConfig.PROPERTIES.AUTOFILL_FIELD] = templateEditProperties[wsnConfig.PROPERTIES.AUTOFILL_FIELD];
       }
       
       // Ensure f1265 (system field) is preserved from template
-      if (templateEditProperties['f1265']) {
-        mergedProperties['f1265'] = templateEditProperties['f1265'];
+      if (templateEditProperties[wsnConfig.PROPERTIES.SYSTEM_FIELD_1265]) {
+        mergedProperties[wsnConfig.PROPERTIES.SYSTEM_FIELD_1265] = templateEditProperties[wsnConfig.PROPERTIES.SYSTEM_FIELD_1265];
       }
 
       // 3. Prepare the save request
       const saveRequest = {
         units: [{
-          ID: template.ID || -15, // Use template ID or default to -15 for new ticket
+          ID: template.ID ?? wsnConfig.NEW_UNIT_FALLBACK_ID,
           Title: 'Заявка № [AUTO] (AI-агент)',
           MetaID: wsnConfig.CLASS_ID,
-          LogID: template.LogID,
+          ...(template.LogID != null ? { LogID: template.LogID } : {}),
           Init: template.Init,
           Edit: {
             Properties: mergedProperties,
@@ -478,24 +567,18 @@ export class TicketStateStore {
         onlyAllSave: true
       };
 
-      // 4. Save the ticket to Forland
-      console.log('Template received:', template);
-      console.log('Merged properties:', mergedProperties);
-      console.log('Save request payload:', JSON.stringify(saveRequest, null, 2));
+      // 4. Save the ticket to Forland. Do not log ticket payloads: they contain PII.
       const saveResult = await forlandApiService.saveTicket(saveRequest);
-      console.log('Save response:', saveResult);
 
-      if (saveResult && saveResult.HttpStatus !== 500) {
+      if (isSaveSuccessful(saveResult)) {
         this.isSubmitted = true;
+        this.submittedTicketId = saveResult?.ID ?? null;
+        this.newTicketTemplate = null;
         this.notify();
         return true;
       }
 
-      // Handle error cases
-      if (saveResult?.HttpStatus === 500) {
-        console.error('Forland API error:', saveResult.Title, saveResult.Error);
-        // Could add user-friendly error message parsing here
-      }
+      console.error('Forland API rejected ticket save:', saveResult?.transportStatus ?? saveResult?.HttpStatus ?? 'no response');
 
       return false;
     } catch (error) {
@@ -506,6 +589,7 @@ export class TicketStateStore {
 
   public resetSubmission(): void {
     this.isSubmitted = false;
+    this.submittedTicketId = null;
     this.notify();
   }
 }

@@ -1,5 +1,13 @@
 const TARGET = 'https://wsn1.forland-solution.com';
 const PREFIX = '/api/forland';
+const ALLOWED_PATHS = new Set([
+  '/Account/login',
+  '/Account/logout',
+  '/Meta/GetRepository',
+  '/DataExchange/GetList',
+  '/Unit/CreateNewUnit',
+  '/Unit/Save'
+]);
 
 const STRIP_HEADERS = new Set([
   'connection',
@@ -26,6 +34,14 @@ function rewriteSetCookie(cookie) {
 
 export default async function handler(req, res) {
   const path = req.url.replace(new RegExp('^' + PREFIX), '') || '/';
+  const pathname = path.split('?')[0];
+
+  if (!ALLOWED_PATHS.has(pathname)) {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ error: 'Forland route is not allowed' }));
+    return;
+  }
 
   const headers = {};
   for (const [key, value] of Object.entries(req.headers)) {
@@ -62,8 +78,6 @@ export default async function handler(req, res) {
 
       res.setHeader(key, value);
     });
-
-    res.setHeader('Access-Control-Allow-Origin', '*');
 
     const body = await upstream.arrayBuffer();
     res.end(Buffer.from(body));

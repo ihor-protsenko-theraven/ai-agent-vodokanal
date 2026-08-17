@@ -1,8 +1,14 @@
 /**
  * AI System Prompts, Models and Constants
  */
+export type AiMode = 'local' | 'gemini';
+
+export function resolveAiMode(value: string | undefined): AiMode {
+  return value === 'local' ? 'local' : 'gemini';
+}
+
 export const aiConfig = {
-  GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',
+  MODE: resolveAiMode(import.meta.env.VITE_AI_MODE),
   GEMINI_MODEL: 'gemini-1.5-flash-latest',
   GEMINI_TEMPERATURE: 0.1,
   GEMINI_CANDIDATE_MODELS: [

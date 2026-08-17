@@ -58,7 +58,7 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 
 - **🔐 Authentication & Role Management**:
   - Role-based access: `Chief Dispatcher (Admin)` and `ARM Operator`.
-  - Dynamic in-app Gemini API Key configuration.
+  - Server-side Gemini integration; API key is not exposed to the browser.
   - Forland API session management.
 
 ---
@@ -73,7 +73,7 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 | **AI Model** | [Google Gemini 1.5 / 2.5 Flash](https://ai.google.dev/) |
 | **NLP Processing** | Custom Ukrainian NLP parsers & classifiers |
 | **Geocoding API** | [OpenStreetMap Nominatim API](https://nominatim.openstreetmap.org/) |
-| **Enterprise API** | [Forland API](https://zhytomyr.forland-solution.com/) |
+| **Enterprise API** | [Forland API](https://wsn1.forland-solution.com/) |
 | **Speech Recognition** | Web Speech API (`SpeechRecognition`) |
 | **Deployment** | [Vercel](https://vercel.com/) + Serverless Functions |
 
@@ -84,7 +84,8 @@ The system is designed to reduce dispatcher workload during peak call volumes. T
 ```
 ai-agent-vodokanal/
 ├── api/
-│   └── forland.js                # Vercel serverless function for Forland API proxy
+│   ├── forland.js                # Vercel serverless function for Forland API proxy
+│   └── gemini.js                 # Server-side Gemini proxy
 ├── public/
 │   └── assets/
 │       └── scenarios/            # Text files for test call scenarios
@@ -177,6 +178,17 @@ npm run dev
 ```
 Open `http://localhost:3000` in your browser.
 
+`npm run dev` intentionally uses **local AI mode**: it does not call Gemini and
+does not require a key. With text from browser speech recognition, the local
+parser extracts the appeal type, phone and address; without a transcript, the
+application uses demo scenarios. The amber `Локальний AI` badge confirms this
+mode in the UI.
+
+To use real Gemini during local integration testing, set
+`VITE_AI_MODE=gemini` only in an environment that also serves the server-side
+`/api/gemini` function and has `GEMINI_API_KEY` configured. Do not put the key
+in a `VITE_*` variable.
+
 ### 4. Build for Production
 ```bash
 npm run build
@@ -189,9 +201,9 @@ Create a `.env` file based on `.env.example`:
 cp .env.example .env
 ```
 
-Required environment variables:
-- `VITE_GEMINI_API_KEY`: Your Google Gemini API key
-- Forland API credentials are configured through the application UI
+Required environment variables (configure them only in Vercel; do not expose them to Vite):
+- `GEMINI_API_KEY`: Google Gemini API key used only by `/api/gemini`
+- Forland credentials are entered by each operator in the application UI
 
 ---
 
@@ -200,15 +212,15 @@ Required environment variables:
 The project includes a pre-configured Vercel build setup (`vercel.json`) and a serverless function for Forland API proxy (`api/forland.js`).
 
 ### Development
-- Uses Vite dev server proxy for Forland API (`/forland` -> `https://zhytomyr.forland-solution.com`)
+- Uses Vite dev server proxy for Forland API (`/forland` -> `https://wsn1.forland-solution.com`)
 - Configure in `vite.config.ts`
 
 ### Production Deployment
 1. Import your GitHub repository into the [Vercel Dashboard](https://vercel.com/new).
 2. Vercel automatically detects Vite settings from `vercel.json` (`npm run build` -> `dist`).
-3. The serverless function `api/forland.js` handles Forland API proxy with CORS headers.
+3. The serverless functions handle the Forland and Gemini server-side integrations.
 4. Configure environment variables in Vercel dashboard:
-   - `VITE_GEMINI_API_KEY`: Your Google Gemini API key
+   - `GEMINI_API_KEY`: Your Google Gemini API key
 
 ### GitHub Actions Workflow (Optional)
 If using the included `.github/workflows/deploy.yml`, configure the following Repository Secrets in GitHub (`Settings > Secrets and variables > Actions`):

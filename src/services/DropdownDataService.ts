@@ -87,7 +87,7 @@ class DropdownDataService {
       // Appeal types (Тип звернення) from GetList API by kindUnitID
       const appealTypesData = await forlandApiService.getList({
         kindUnitID: wsnConfig.APPEAL_TYPE_KIND_UNIT_ID,
-        stateID: -5001
+        stateID: wsnConfig.ANY_STATE_ID
       });
 
       if (appealTypesData) {

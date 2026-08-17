@@ -1,4 +1,4 @@
-import { AgentProcessingResult } from '../types/ticket';
+import { AgentProcessingResult, TicketDuplicate } from '../types/ticket';
 import { aiConfig, geoConfig, nlpConfig, speechConfig, wsnConfig } from '../config';
 import { geocodingService } from './GeocodingService';
 import { AppealTypeClassifier } from './nlp/AppealTypeClassifier';
@@ -6,7 +6,6 @@ import { PhoneExtractor } from './nlp/PhoneExtractor';
 import { ApplicantNameExtractor } from './nlp/ApplicantNameExtractor';
 import { UkrainianAddressParser } from './nlp/UkrainianAddressParser';
 import { QuestionGenerator } from './nlp/QuestionGenerator';
-import { DuplicateFinder } from './DuplicateFinder';
 import { formatDateTimeLocal, generateCallId } from '../utils/wsn';
 
 /**
@@ -23,7 +22,6 @@ export class VoiceDictationService {
   private nameExtractor = new ApplicantNameExtractor();
   private addressParser = new UkrainianAddressParser();
   private questionGenerator = new QuestionGenerator();
-  private duplicateFinder = new DuplicateFinder();
 
   private constructor() {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -148,8 +146,9 @@ export class VoiceDictationService {
     const requiresManualReview =
       addressConfidence < aiConfig.CONFIDENCE_THRESHOLD || geoConfidence < aiConfig.CONFIDENCE_THRESHOLD;
 
-    // 5. Scenario 2: Automated Duplicate Ticket Detection (matching active tickets on Khreshchatyk / repeats)
-    const duplicatesFound = this.duplicateFinder.find({ addressText, searchText: lower, appealType });
+    // Duplicate detection happens centrally in TicketStateStore against the
+    // authenticated Forland session. Never fabricate a local ticket here.
+    const duplicatesFound: TicketDuplicate[] = [];
 
     // 6. Generate Contextual Suggested Questions
     const suggestedQuestions = this.questionGenerator.generate(appealType);

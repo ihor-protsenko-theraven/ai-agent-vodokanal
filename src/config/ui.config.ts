@@ -16,8 +16,7 @@ export const uiConfig = {
 
   NOTES_CLARIFICATION_PREFIX: 'Уточнення: ',
 
-  LOGIN_ERROR_MESSAGE: (adminUser: string, adminPass: string): string =>
-    `Невірне ім'я користувача або пароль. Використовуйте ${adminUser} / ${adminPass}.`,
+  LOGIN_ERROR_MESSAGE: 'Невірне ім’я користувача або пароль. Перевірте дані облікового запису Forland.',
 
   WAVE_BAR_COUNT: 32,
 

@@ -33,10 +33,6 @@ export const nlpConfig = {
 
   CONSULTATION_ADDRESS_LABEL: 'Консультація (без виїзду бригади)',
 
-  DUPLICATE_ADDRESS_KEYWORDS: ['хрещатик'],
-  DUPLICATE_UTTERANCE_KEYWORDS: ['телефонували', 'повторно', 'бригада так і не приїхала'],
-  DUPLICATE_TICKET_ID_SUFFIX: '0912',
-
   CALL_ID_PREFIX: 'CALL-VOICE',
 
   PHONE_PATTERNS: [

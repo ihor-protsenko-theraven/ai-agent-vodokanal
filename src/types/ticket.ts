@@ -22,10 +22,14 @@ export interface ConfidenceScores {
 
 export interface TicketDuplicate {
   ticketId: string;
-  matchReason: 'ADDRESS_MATCH' | 'COORDINATES_MATCH' | 'APPEAL_TYPE_MATCH';
+  matchReason: 'ADDRESS_MATCH' | 'COORDINATES_MATCH' | 'APPEAL_TYPE_MATCH' | 'TITLE_ADDRESS_CANDIDATE';
+  ticketTitle?: string;
+  logId?: string | number;
+  metaId?: number;
   createdDate?: string;
   status?: string;
   addressText?: string;
+  coordinates?: string;
   appealType?: string;
 }
 
@@ -37,6 +41,7 @@ export interface AgentProcessingResult {
   requiresManualReview: boolean;
   suggestedQuestions: string[];
   duplicatesFound: TicketDuplicate[];
+  duplicateCheckStatus?: 'COMPLETED' | 'REQUIRED' | 'UNAVAILABLE';
   requiresTicketRegistration: boolean;
 }
 

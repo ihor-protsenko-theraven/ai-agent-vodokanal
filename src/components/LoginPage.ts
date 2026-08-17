@@ -1,5 +1,5 @@
 import { TicketStateStore } from '../services/TicketStateStore';
-import { appConfig, authConfig, uiConfig } from '../config';
+import { appConfig, uiConfig } from '../config';
 import { escapeHtml } from '../utils/security';
 
 export class LoginPageComponent {
@@ -65,7 +65,6 @@ export class LoginPageComponent {
                   <input
                     type="text"
                     id="login-username"
-                    value="${escapeHtml(authConfig.DEFAULT_ADMIN_USER)}"
                     placeholder="Введіть username"
                     required
                     class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono"
@@ -82,23 +81,11 @@ export class LoginPageComponent {
                   <input
                     type="password"
                     id="login-password"
-                    value="${escapeHtml(authConfig.DEFAULT_ADMIN_PASS)}"
                     placeholder="Введіть пароль"
                     required
                     class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all font-mono"
                   />
                 </div>
-              </div>
-
-              <!-- Quick Autofill Helper -->
-              <div class="pt-1">
-                <button
-                  type="button"
-                  id="btn-autofill"
-                  class="w-full py-2 px-3 bg-slate-800/80 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs text-sky-300 font-medium transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>🧪 Автозаповнення: <strong>${escapeHtml(authConfig.DEFAULT_ADMIN_USER)}</strong> / <strong>${escapeHtml(authConfig.DEFAULT_ADMIN_PASS)}</strong></span>
-                </button>
               </div>
 
               <!-- Submit Button -->
@@ -134,21 +121,7 @@ export class LoginPageComponent {
 
         const success = await this.store.login(userInput, passInput);
         if (!success) {
-          this.errorMessage = uiConfig.LOGIN_ERROR_MESSAGE(authConfig.DEFAULT_ADMIN_USER, authConfig.DEFAULT_ADMIN_PASS);
-          this.render();
-        }
-      });
-    }
-
-    const btnAutofill = this.container.querySelector('#btn-autofill');
-    if (btnAutofill) {
-      btnAutofill.addEventListener('click', () => {
-        const userInput = this.container.querySelector('#login-username') as HTMLInputElement;
-        const passInput = this.container.querySelector('#login-password') as HTMLInputElement;
-        if (userInput && passInput) {
-          userInput.value = authConfig.DEFAULT_ADMIN_USER;
-          passInput.value = authConfig.DEFAULT_ADMIN_PASS;
-          this.errorMessage = '';
+          this.errorMessage = uiConfig.LOGIN_ERROR_MESSAGE;
           this.render();
         }
       });

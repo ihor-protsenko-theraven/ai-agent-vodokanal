@@ -1,8 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
 import { wsnConfig } from '../config';
-import { WsnSubmitPayload } from '../types';
-import { generateWsnTicketId } from '../utils/wsn';
 
 export class SubmissionToastComponent {
   private store: TicketStateStore;
@@ -20,31 +18,10 @@ export class SubmissionToastComponent {
       return;
     }
 
-    const formData = this.store.getFormData();
-    const result = this.store.getResult();
-
-    const wsnPayload: WsnSubmitPayload = {
-      wsnClassId: wsnConfig.CLASS_ID,
-      wsnStatusId: wsnConfig.DEFAULT_STATUS_ID,
-      statusName: wsnConfig.DEFAULT_STATUS_NAME,
-      operatorId: wsnConfig.OPERATOR_ID,
-      serviceAccount: wsnConfig.SERVICE_ACCOUNT,
-      callId: result.callId,
-      properties: {
-        [wsnConfig.PROPERTIES.APPEAL_TYPE]: formData.appealType,
-        [wsnConfig.PROPERTIES.TICKET_TYPE]: formData.ticketType,
-        [wsnConfig.PROPERTIES.APPLICANT_NAME]: formData.applicantName,
-        [wsnConfig.PROPERTIES.APPLICANT_ADDRESS]: formData.applicantAddress,
-        [wsnConfig.PROPERTIES.ADDRESS_TEXT]: formData.addressText,
-        [wsnConfig.PROPERTIES.COORDINATES]: formData.coordinates,
-        [wsnConfig.PROPERTIES.PHONE_NUMBER]: formData.phoneNumber,
-        [wsnConfig.PROPERTIES.INCIDENT_DATE_TIME]: formData.incidentDateTime,
-        [wsnConfig.PROPERTIES.NOTES]: formData.notes
-      },
-      confirmedAt: new Date().toISOString()
-    };
-
-    const generatedTicketId = generateWsnTicketId(wsnConfig.CLASS_ID, wsnConfig.DEFAULT_STATUS_ID);
+    const submittedTicketId = this.store.getSubmittedTicketId();
+    const ticketReference = submittedTicketId == null
+      ? 'Номер заявки не повернувся у відповіді Forland.'
+      : `Номер заявки Forland: ${submittedTicketId}`;
 
     this.container.innerHTML = `
       <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -65,24 +42,15 @@ export class SubmissionToastComponent {
                 </span>
               </div>
               <p class="text-xs text-slate-300">
-                Заявка класу <strong class="text-sky-300">${wsnConfig.CLASS_ID}</strong> зареєстрована в WSN через API під номером 
-                <span class="font-mono font-bold text-emerald-400">${escapeHtml(generatedTicketId)}</span>
+                Заявка класу <strong class="text-sky-300">${wsnConfig.CLASS_ID}</strong> підтверджена API.
+                <span class="font-mono font-bold text-emerald-400">${escapeHtml(ticketReference)}</span>
               </p>
             </div>
           </div>
 
-          <!-- Payload Details -->
-          <div class="space-y-2">
-            <h4 class="text-xs font-bold text-slate-300 flex items-center justify-between">
-              <span>Пакет даних API (WSN Service Account):</span>
-              <span class="text-[10px] text-slate-500 font-mono">JSON 200 OK</span>
-            </h4>
-            <pre class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-[11px] font-mono text-sky-300 overflow-x-auto max-h-60 leading-relaxed">${escapeHtml(JSON.stringify(wsnPayload, null, 2))}</pre>
-          </div>
-
           <!-- Footer Actions -->
           <div class="flex items-center justify-between border-t border-slate-800 pt-4">
-            <span class="text-xs text-slate-400">Оператор підтвердив збіг даних.</span>
+            <span class="text-xs text-slate-400">Персональні дані не виводяться у вікні підтвердження.</span>
             <button id="btn-close-toast" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20">
               Зрозуміло (Закрити)
             </button>

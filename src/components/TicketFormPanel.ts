@@ -26,6 +26,9 @@ export class TicketFormPanelComponent {
 
     const registrationBlocked = !result.requiresTicketRegistration && !isForceUnlocked;
     const duplicates = result.duplicatesFound || [];
+    const duplicateCheckUnavailable = result.duplicateCheckStatus === 'UNAVAILABLE';
+    const duplicateCheckRequired = result.duplicateCheckStatus === 'REQUIRED';
+    const isCheckingDuplicates = this.store.getIsCheckingDuplicates();
 
     // Get dropdown options from service
     const appealTypes = dropdownDataService.getAppealTypes();
@@ -115,8 +118,9 @@ export class TicketFormPanelComponent {
                 <div>
                   <h3 class="text-sm font-bold text-amber-300">Увага! Знайдено можливі дублікати WSN</h3>
                   <p class="text-xs text-amber-200/80 mt-0.5">
-                    Виявлено <strong>${duplicates.length}</strong> існуючих заявок класу ${wsnConfig.CLASS_ID} за цією адресою/координатами:
+                    Виявлено <strong>${duplicates.length}</strong> збігів адреси або координат з активними заявками класу ${wsnConfig.CLASS_ID}:
                     <span class="font-mono underline font-semibold ml-1">${duplicates.map(d => escapeHtml(d.ticketId)).join(', ')}</span>
+                    Створення призупинено до ручної перевірки в WSN.
                   </p>
                 </div>
               </div>
@@ -126,7 +130,22 @@ export class TicketFormPanelComponent {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                 </svg>
-                Відкрити існуючу
+                Переглянути кандидата
+              </button>
+            </div>
+          ` : ''}
+
+          ${duplicateCheckUnavailable ? `
+            <div class="bg-rose-950/40 border border-rose-500/60 rounded-xl p-3 text-xs text-rose-200">
+              Перевірка можливих дублікатів у Forland недоступна. Створення заявки заблоковано, щоб не створити дубль.
+            </div>
+          ` : ''}
+
+          ${duplicateCheckRequired ? `
+            <div class="bg-amber-950/40 border border-amber-500/60 rounded-xl p-3 text-xs text-amber-100 flex flex-wrap items-center justify-between gap-3">
+              <span>Адресу змінено. Перед збереженням перевірте можливі дублікати у Forland.</span>
+              <button id="btn-check-duplicates" ${isCheckingDuplicates ? 'disabled' : ''} class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 text-slate-950 disabled:text-slate-300 font-semibold rounded-lg text-xs transition-all">
+                ${isCheckingDuplicates ? 'Перевірка…' : 'Перевірити дублікати'}
               </button>
             </div>
           ` : ''}
@@ -380,9 +399,10 @@ export class TicketFormPanelComponent {
           `}
         </div>
 
-        <!-- Input Control -->
-        ${opts.type === 'select' ? `
+          <!-- Input Control -->
+          ${opts.type === 'select' ? `
           <select id="field-${opts.fieldKey}" data-field="${opts.fieldKey}" class="form-input w-full bg-slate-900 text-xs rounded-lg border border-slate-700 text-slate-100 p-2.5 focus:ring-2 focus:ring-sky-500 focus:outline-none ${isLowConfidence && !isVerified ? 'low-confidence-field' : ''}">
+            <option value="" class="bg-slate-900" ${!opts.value ? 'selected' : ''} disabled>Оберіть значення</option>
             ${(opts.options || []).map(opt => `
               <option value="${escapeHtml(opt)}" class="bg-slate-900 text-slate-100" ${opt === opts.value ? 'selected' : ''}>${escapeHtml(opt)}</option>
             `).join('')}
@@ -423,10 +443,21 @@ export class TicketFormPanelComponent {
         const target = e.target as HTMLInputElement;
         const fieldKey = target.dataset.field as keyof WsnTicketData;
         if (fieldKey) {
-          this.store.updateFormField(fieldKey, target.value);
+          // Keep the store current without rebuilding the entire form on every
+          // keystroke. A full render would replace this input and lose focus.
+          this.store.updateFormField(fieldKey, target.value, false);
           if (fieldKey === 'addressText') {
             this.scheduleAutoGeocode();
           }
+        }
+      });
+
+      input.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        const fieldKey = target.dataset.field as keyof WsnTicketData;
+        if (fieldKey) {
+          // Commit validation and dependent UI after the operator completes an edit.
+          this.store.updateFormField(fieldKey, target.value);
         }
       });
     });
@@ -462,8 +493,15 @@ export class TicketFormPanelComponent {
       });
     }
 
+    const checkDuplicatesButton = this.container.querySelector<HTMLButtonElement>('#btn-check-duplicates');
+    if (checkDuplicatesButton) {
+      checkDuplicatesButton.addEventListener('click', async () => {
+        await this.store.checkDuplicates();
+      });
+    }
+
     // Submit ticket button
-    const btnSubmit = this.container.querySelector('#btn-submit-ticket');
+    const btnSubmit = this.container.querySelector<HTMLButtonElement>('#btn-submit-ticket');
     if (btnSubmit) {
       btnSubmit.addEventListener('click', async () => {
         if (this.store.isValid()) {

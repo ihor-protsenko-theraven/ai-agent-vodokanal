@@ -11,7 +11,7 @@ export const apiConfig = {
     SAVE_PATH: '/Unit/Save'
   },
   GEMINI: {
-    BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+    PROXY_PATH: '/api/gemini',
     RATE_LIMIT_STATUS: 429,
     MIN_AUDIO_BASE64_LENGTH: 50,
     JSON_FENCE_PATTERNS: [/```json/g, /```/g]

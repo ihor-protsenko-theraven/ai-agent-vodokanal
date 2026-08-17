@@ -5,5 +5,4 @@ export * from './geocoding';
 export * from './dropdown';
 export * from './nlp';
 export * from './gemini';
-export * from './wsn';
 export * from './ui';
