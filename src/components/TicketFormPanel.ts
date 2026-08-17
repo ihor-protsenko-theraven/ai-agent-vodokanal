@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
-import { FieldVerificationStatus, WsnTicketData } from '../types/ticket';
-import { FormFieldDefinition } from '../types/ui';
+import { FieldVerificationStatus, WsnTicketData } from '../types';
+import { FormFieldDefinition } from '../types';
 import { escapeHtml } from '../utils/security';
 import { aiConfig, geoConfig, wsnConfig, uiConfig } from '../config';
 import { dropdownDataService } from '../services/DropdownDataService';
@@ -157,7 +157,7 @@ export class TicketFormPanelComponent {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- WSN Property 1958: Appeal Type -->
               ${this.renderFormField({
-                label: `Тип звернення (WSN ${wsnConfig.PROPERTIES.APPEAL_TYPE})`,
+                label: `Тип звернення`,
                 fieldKey: 'appealType',
                 value: formData.appealType,
                 type: 'select',
@@ -169,7 +169,7 @@ export class TicketFormPanelComponent {
 
               <!-- WSN Property 1972: Ticket Type -->
               ${this.renderFormField({
-                label: `Тип заявки (WSN ${wsnConfig.PROPERTIES.TICKET_TYPE})`,
+                label: `Тип заявки`,
                 fieldKey: 'ticketType',
                 value: formData.ticketType,
                 type: 'select',
@@ -184,7 +184,7 @@ export class TicketFormPanelComponent {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- WSN Property 1961: Applicant Name -->
               ${this.renderFormField({
-                label: 'ПІБ заявника (WSN 1961)',
+                label: 'ПІБ заявника',
                 fieldKey: 'applicantName',
                 value: formData.applicantName || '',
                 type: 'input',
@@ -196,7 +196,7 @@ export class TicketFormPanelComponent {
 
               <!-- WSN Property 1981: Phone Number -->
               ${this.renderFormField({
-                label: 'Телефон заявника (WSN 1981)',
+                label: 'Телефон заявника',
                 fieldKey: 'phoneNumber',
                 value: formData.phoneNumber,
                 type: 'input',
@@ -211,7 +211,7 @@ export class TicketFormPanelComponent {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <!-- WSN Property 1960: Applicant Address -->
               ${this.renderFormField({
-                label: 'Адреса проживання заявника (WSN 1960)',
+                label: 'Адреса проживання заявника',
                 fieldKey: 'applicantAddress',
                 value: formData.applicantAddress || '',
                 type: 'input',
@@ -223,7 +223,7 @@ export class TicketFormPanelComponent {
 
               <!-- WSN Property 1258: Incident Date/Time -->
               ${this.renderFormField({
-                label: 'Дата й час аварії (WSN 1258)',
+                label: 'Дата й час аварії',
                 fieldKey: 'incidentDateTime',
                 value: typeof formData.incidentDateTime === 'string' ? formData.incidentDateTime : formatDateTimeInput(formData.incidentDateTime),
                 type: 'datetime-local',
@@ -235,7 +235,7 @@ export class TicketFormPanelComponent {
 
             <!-- Address Text (WSN -389) + Geodata Address Search -->
             ${this.renderFormField({
-              label: 'Текст адреси аварії (WSN -389)',
+              label: 'Текст адреси аварії',
               fieldKey: 'addressText',
               value: formData.addressText,
               type: 'input',
@@ -276,7 +276,7 @@ export class TicketFormPanelComponent {
 
             <!-- Coordinates (WSN -420) - MANDATORY + Reverse Geocoding -->
             ${this.renderFormField({
-              label: 'Координати (WSN -420) *ОБОВ\'ЯЗКОВЕ*',
+              label: 'Координати *ОБОВ\'ЯЗКОВЕ*',
               fieldKey: 'coordinates',
               value: formData.coordinates,
               type: 'input',
@@ -299,7 +299,7 @@ export class TicketFormPanelComponent {
 
             <!-- Notes (WSN 328) - MANDATORY -->
             ${this.renderFormField({
-              label: 'Примітки / Зміст звернення (WSN 328) *ОБОВ\'ЯЗКОВЕ*',
+              label: 'Примітки / Зміст звернення *ОБОВ\'ЯЗКОВЕ*',
               fieldKey: 'notes',
               value: formData.notes,
               type: 'textarea',
@@ -465,9 +465,39 @@ export class TicketFormPanelComponent {
     // Submit ticket button
     const btnSubmit = this.container.querySelector('#btn-submit-ticket');
     if (btnSubmit) {
-      btnSubmit.addEventListener('click', () => {
+      btnSubmit.addEventListener('click', async () => {
         if (this.store.isValid()) {
-          this.store.submitTicket();
+          // Show loading state
+          btnSubmit.disabled = true;
+          btnSubmit.innerHTML = `
+            <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Збереження...
+          `;
+
+          const success = await this.store.submitTicket();
+          
+          if (success) {
+            btnSubmit.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Заявку створено!
+            `;
+            btnSubmit.classList.remove('from-sky-500', 'to-sky-600', 'hover:from-sky-400', 'hover:to-sky-500');
+            btnSubmit.classList.add('from-emerald-500', 'to-emerald-600', 'hover:from-emerald-400', 'hover:to-emerald-500');
+          } else {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = `
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Створити заявку (WSN Клас ${wsnConfig.CLASS_ID} / Статус ${wsnConfig.DEFAULT_STATUS_ID})
+            `;
+            alert('Помилка при створенні заявки. Деталі дивіться в консолі браузера (F12).');
+          }
         }
       });
     }

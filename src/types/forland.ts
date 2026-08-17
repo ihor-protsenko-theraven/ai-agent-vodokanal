@@ -48,3 +48,54 @@ export interface GetListItem {
 }
 
 export type GetListResponse = GetListItem[];
+
+export interface CreateNewUnitRequest {
+  KindUnitID: number;
+}
+
+export interface CreateNewUnitResponse {
+  ID?: number;
+  Title?: string;
+  MetaID?: number;
+  LogID?: string;
+  Init?: {
+    StateID?: number;
+    Properties?: Record<string, unknown>;
+  };
+  Edit?: {
+    Properties?: Record<string, unknown>;
+    StateID?: number;
+  };
+}
+
+export interface Unit {
+  ID: number;
+  Title?: string;
+  MetaID?: number;
+  LogID?: string;
+  Init?: {
+    StateID?: number;
+    Properties?: Record<string, unknown>;
+  };
+  Edit?: {
+    Properties?: Record<string, unknown>;
+    StateID?: number;
+  };
+}
+
+export interface SaveRequest {
+  units: Unit[];
+  onlyAllSave?: boolean;
+}
+
+export interface SaveResponse {
+  success?: boolean;
+  ID?: number;
+  error?: string;
+  HttpStatus?: number;
+  ErrorID?: string;
+  Title?: string;
+  Error?: string;
+  InnerExceptions?: string;
+  ErrorMessage?: string;
+}

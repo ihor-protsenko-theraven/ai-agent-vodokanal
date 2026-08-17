@@ -5,13 +5,13 @@ import {
   TicketDuplicate,
   UserSession,
   WsnTicketData
-} from '../types/ticket';
+} from '../types';
 import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
 import { authConfig, aiConfig, wsnConfig, uiConfig } from '../config';
 import { forlandApiService } from './ForlandApiService';
 import { dropdownDataService } from './DropdownDataService';
 import { DuplicateFinder } from './DuplicateFinder';
-import { formatDateTimeInput } from '../utils/wsn';
+import { formatDateTimeInput, formatForlandDateTimeMinutePrecision, formatForlandDateTimeMinutePrecisionWithTimezone } from '../utils/wsn';
 
 export type StateChangeListener = () => void;
 
@@ -118,20 +118,33 @@ export class TicketStateStore {
     this.notify();
   }
 
-  public loadRealResult(realResult: AgentProcessingResult): void {
+  public async loadRealResult(realResult: AgentProcessingResult): Promise<void> {
     this.activeScenarioId = aiConfig.SCENARIOS.REAL_AUDIO;
     this.isProcessingAudio = false;
     this.result = realResult;
 
-    // Automated duplicate check against WSN database
+    // Automated duplicate check against WSN database using real API
     if ((!this.result.duplicatesFound || this.result.duplicatesFound.length === 0) && this.result.requiresTicketRegistration) {
-      const found = this.duplicateFinder.find({
-        addressText: this.result.ticket.addressText || '',
-        searchText: this.result.ticket.addressText || '',
-        appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
-      });
-      if (found.length > 0) {
-        this.result.duplicatesFound = found;
+      try {
+        const found = await this.duplicateFinder.findRealDuplicates({
+          addressText: this.result.ticket.addressText || '',
+          searchText: this.result.ticket.addressText || '',
+          appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
+        });
+        if (found.length > 0) {
+          this.result.duplicatesFound = found;
+        }
+      } catch (error) {
+        console.error('Error in real duplicate check, falling back to local:', error);
+        // Fallback to local detection if API fails
+        const found = this.duplicateFinder.find({
+          addressText: this.result.ticket.addressText || '',
+          searchText: this.result.ticket.addressText || '',
+          appealType: this.result.ticket.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
+        });
+        if (found.length > 0) {
+          this.result.duplicatesFound = found;
+        }
       }
     }
 
@@ -355,10 +368,139 @@ export class TicketStateStore {
     return errors;
   }
 
-  public submitTicket(): void {
-    if (this.isValid()) {
-      this.isSubmitted = true;
-      this.notify();
+  public async submitTicket(): Promise<boolean> {
+    if (!this.isValid()) {
+      return false;
+    }
+
+    try {
+      // 1. Get new ticket template from Forland
+      const template = await forlandApiService.createNewUnit(wsnConfig.CLASS_ID);
+      
+      if (!template) {
+        console.error('Failed to create new unit template');
+        return false;
+      }
+
+      // 2. Merge template properties with form data, preserving all system fields
+      const templateEditProperties = template.Edit?.Properties || {};
+      const templateInitProperties = template.Init?.Properties || {};
+
+      // Get IDs for dropdown values instead of text
+      const appealTypeId = dropdownDataService.getAppealTypeId(this.formData.appealType);
+      const ticketTypeId = dropdownDataService.getTicketTypeId(this.formData.ticketType);
+
+      console.log('Form data appeal type:', this.formData.appealType, 'ID:', appealTypeId);
+      console.log('Form data ticket type:', this.formData.ticketType, 'ID:', ticketTypeId);
+      
+      // Use ID for both appeal type and ticket type
+      const appealTypeValue = appealTypeId ?? this.formData.appealType;
+      const ticketTypeValue = ticketTypeId ?? this.formData.ticketType;
+
+      // Format coordinates for Forland API (WKT format)
+      const formattedCoordinates: string | Record<string, unknown> = (() => {
+        const coords = this.formData.coordinates;
+        if (!coords || !coords.includes(',')) return coords;
+
+        const [lat, lng] = coords.split(',').map(c => c.trim());
+        const latNum = Number(lat);
+        const lngNum = Number(lng);
+
+        if (!Number.isNaN(latNum) && !Number.isNaN(lngNum)) {
+          return {
+            wkt: `POINT(${lngNum} ${latNum})`,
+            center: null,
+            needProcessing: true,
+            z: null
+          };
+        }
+        
+        return coords;
+      })();
+
+      // Create the merged properties object
+      const mergedProperties: Record<string, unknown> = {
+        // Preserve all system fields from template first
+        ...templateInitProperties,
+        ...templateEditProperties,
+        
+        // Override with form data (user-entered fields)
+        // Appeal type uses text value, ticket type uses ID
+        [wsnConfig.PROPERTIES.APPEAL_TYPE]: appealTypeValue,
+        [wsnConfig.PROPERTIES.TICKET_TYPE]: ticketTypeValue,
+        [wsnConfig.PROPERTIES.APPLICANT_NAME]: this.formData.applicantName,
+        [wsnConfig.PROPERTIES.APPLICANT_ADDRESS]: this.formData.applicantAddress,
+        [wsnConfig.PROPERTIES.ADDRESS_TEXT]: this.formData.addressText,
+        [wsnConfig.PROPERTIES.COORDINATES]: formattedCoordinates,
+        [wsnConfig.PROPERTIES.PHONE_NUMBER]: this.formData.phoneNumber,
+        [wsnConfig.PROPERTIES.INCIDENT_DATE_TIME]: formatForlandDateTimeMinutePrecision(new Date(this.formData.incidentDateTime)),
+        [wsnConfig.PROPERTIES.NOTES]: this.formData.notes
+      };
+
+      // Ensure Init arrays are preserved (they are required)
+      const initArrays = ['f1268', 'f1954', 'f1974', 'f_221'];
+      for (const arrayField of initArrays) {
+        if (templateInitProperties[arrayField] !== undefined) {
+          mergedProperties[arrayField] = templateInitProperties[arrayField];
+        } else {
+          // Initialize empty arrays if not present in template
+          mergedProperties[arrayField] = [];
+        }
+      }
+
+      // Override system date fields with current data (use minute precision)
+      mergedProperties['f1258'] = formatForlandDateTimeMinutePrecision(new Date()); // Current time for f1258
+      mergedProperties['f_297'] = formatForlandDateTimeMinutePrecisionWithTimezone(new Date()); // Document date with timezone
+      
+      // Ensure f_296 (autofill) is preserved from template
+      if (templateEditProperties['f_296']) {
+        mergedProperties['f_296'] = templateEditProperties['f_296'];
+      }
+      
+      // Ensure f1265 (system field) is preserved from template
+      if (templateEditProperties['f1265']) {
+        mergedProperties['f1265'] = templateEditProperties['f1265'];
+      }
+
+      // 3. Prepare the save request
+      const saveRequest = {
+        units: [{
+          ID: template.ID || -15, // Use template ID or default to -15 for new ticket
+          Title: 'Заявка № [AUTO] (AI-агент)',
+          MetaID: wsnConfig.CLASS_ID,
+          LogID: template.LogID,
+          Init: template.Init,
+          Edit: {
+            Properties: mergedProperties,
+            StateID: wsnConfig.DEFAULT_STATUS_ID
+          }
+        }],
+        onlyAllSave: true
+      };
+
+      // 4. Save the ticket to Forland
+      console.log('Template received:', template);
+      console.log('Merged properties:', mergedProperties);
+      console.log('Save request payload:', JSON.stringify(saveRequest, null, 2));
+      const saveResult = await forlandApiService.saveTicket(saveRequest);
+      console.log('Save response:', saveResult);
+
+      if (saveResult && saveResult.HttpStatus !== 500) {
+        this.isSubmitted = true;
+        this.notify();
+        return true;
+      }
+
+      // Handle error cases
+      if (saveResult?.HttpStatus === 500) {
+        console.error('Forland API error:', saveResult.Title, saveResult.Error);
+        // Could add user-friendly error message parsing here
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Error submitting ticket:', error);
+      return false;
     }
   }
 

@@ -1,4 +1,4 @@
-const TARGET = 'https://zhytomyr.forland-solution.com';
+const TARGET = 'https://wsn1.forland-solution.com';
 const PREFIX = '/api/forland';
 
 const STRIP_HEADERS = new Set([

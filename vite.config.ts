@@ -6,7 +6,7 @@ export default defineConfig({
     open: true,
     proxy: {
       '/forland': {
-        target: 'https://zhytomyr.forland-solution.com',
+        target: 'https://wsn1.forland-solution.com',
         changeOrigin: true,
         secure: true,
         rewrite: (path) => path.replace(/^\/forland/, ''),

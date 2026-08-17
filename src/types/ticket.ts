@@ -1,13 +1,16 @@
 export interface WsnTicketData {
-  appealType: string;         // WSN Property 1958 (Тип звернення)
-  ticketType: string;         // WSN Property 1972 (Тип заявки)
-  applicantName?: string;     // WSN Property 1961 (ПІБ заявника)
-  applicantAddress?: string;  // WSN Property 1960 (Адреса проживання)
-  addressText: string;        // WSN Property -389 (Текст адреси)
-  coordinates: string;        // WSN Property -420 (Координати) - MANDATORY
-  phoneNumber: string;        // WSN Property 1981 (Телефон заявника)
-  incidentDateTime: Date | string; // WSN Property 1258 (Дата й час аварії)
-  notes: string;              // WSN Property 328 (Примітки) - MANDATORY
+  appealType: string;         // WSN Property f1958 (Тип звернення)
+  ticketType: string;         // WSN Property f1972 (Тип заявки)
+  applicantName?: string;     // WSN Property f1961 (ПІБ заявника)
+  applicantAddress?: string;  // WSN Property f1960 (Адреса проживання)
+  addressText: string;        // WSN Property f_389 (Текст адреси)
+  coordinates: string;        // WSN Property f_420 (Координати) - MANDATORY
+  phoneNumber: string;        // WSN Property f1981 (Телефон заявника)
+  incidentDateTime: Date | string; // WSN Property f1258 (Дата й час аварії)
+  notes: string;              // WSN Property f328 (Примітки) - MANDATORY
+  // System fields (usually auto-filled by Forland)
+  autofillField?: string;     // WSN Property f_296
+  documentDate?: Date | string; // WSN Property f_297
 }
 
 export interface ConfidenceScores {

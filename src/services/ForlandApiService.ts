@@ -9,12 +9,17 @@
 
 import { apiConfig } from '../config';
 import {
+  CreateNewUnitRequest,
+  CreateNewUnitResponse,
   GetListParams,
   GetListResponse,
   LoginRequest,
   RepositoryResponse,
+  SaveRequest,
+  SaveResponse,
+  Unit,
   ValueItem
-} from '../types/forland';
+} from '../types';
 
 class ForlandApiService {
   private baseUrl: string = import.meta.env.DEV ? '/forland' : '/api/forland';
@@ -173,6 +178,101 @@ class ForlandApiService {
   }
 
   /**
+   * Get all unclosed tickets by kindUnitID with multiple stateIDs.
+   * This helps to avoid duplicates by checking all active ticket states.
+   */
+  async getUnclosedTickets(kindUnitID: number, stateIDs: number[]): Promise<ValueItem[] | null> {
+    try {
+      const query = new URLSearchParams();
+      query.set('kindUnitID', String(kindUnitID));
+      
+      // Add multiple stateID parameters
+      stateIDs.forEach(stateID => {
+        query.append('stateID', String(stateID));
+      });
+
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.GET_LIST_PATH}?${query.toString()}`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data: unknown = await response.json();
+      if (!Array.isArray(data)) {
+        return null;
+      }
+
+      return (data as GetListResponse)
+        .filter((item) => item && item.ID != null && item.Title)
+        .map((item) => ({
+          ID: item.ID,
+          Value: String(item.Title).trim()
+        }));
+    } catch (error) {
+      console.error('GetUnclosedTickets error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create a new unit template for the specified kindUnitID.
+   * Returns an initialized unit structure that can be used for creating new tickets.
+   */
+  async createNewUnit(kindUnitID: number): Promise<CreateNewUnitResponse | null> {
+    try {
+      const request: CreateNewUnitRequest = { KindUnitID: kindUnitID };
+      const formData = new FormData();
+      formData.append('request', JSON.stringify(request));
+
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.CREATE_NEW_UNIT_PATH}`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data as CreateNewUnitResponse;
+    } catch (error) {
+      console.error('CreateNewUnit error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Save a ticket (create new or update existing).
+   * Handles both creation (negative ID) and update (positive ID) scenarios.
+   */
+  async saveTicket(request: SaveRequest): Promise<SaveResponse | null> {
+    try {
+      const formData = new FormData();
+      formData.append('request', JSON.stringify(request));
+
+      const response = await fetch(`${this.baseUrl}${apiConfig.FORLAND.SAVE_PATH}`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data as SaveResponse;
+    } catch (error) {
+      console.error('SaveTicket error:', error);
+      return null;
+    }
+  }
+
+  /**
    * Check if authenticated
    */
   isAuthenticated(): boolean {
@@ -181,4 +281,15 @@ class ForlandApiService {
 }
 
 export const forlandApiService = new ForlandApiService();
-export type { GetListParams, GetListResponse, LoginRequest, RepositoryResponse, ValueItem };
+export type { 
+  CreateNewUnitRequest, 
+  CreateNewUnitResponse, 
+  GetListParams, 
+  GetListResponse, 
+  LoginRequest, 
+  RepositoryResponse, 
+  SaveRequest, 
+  SaveResponse, 
+  Unit, 
+  ValueItem 
+};

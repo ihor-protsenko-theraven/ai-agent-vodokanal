@@ -1,4 +1,4 @@
-import { AgentProcessingResult, ScenarioDefinition } from '../types/ticket';
+import { AgentProcessingResult, ScenarioDefinition } from '../types';
 import { aiConfig } from '../config';
 
 /**

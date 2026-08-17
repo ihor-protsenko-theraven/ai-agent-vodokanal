@@ -4,8 +4,8 @@
  */
 
 import { forlandApiService } from './ForlandApiService';
-import { ValueItem } from '../types/forland';
-import { DropdownData } from '../types/dropdown';
+import { ValueItem } from '../types';
+import { DropdownData } from '../types';
 import { wsnConfig } from '../config';
 
 class DropdownDataService {
@@ -86,7 +86,8 @@ class DropdownDataService {
 
       // Appeal types (Тип звернення) from GetList API by kindUnitID
       const appealTypesData = await forlandApiService.getList({
-        kindUnitID: wsnConfig.APPEAL_TYPE_KIND_UNIT_ID
+        kindUnitID: wsnConfig.APPEAL_TYPE_KIND_UNIT_ID,
+        stateID: -5001
       });
 
       if (appealTypesData) {
@@ -156,6 +157,22 @@ class DropdownDataService {
    */
   getTicketTypeById(id: number): string | undefined {
     return this.data.ticketTypes.find(item => item.ID === id)?.Value;
+  }
+
+  /**
+   * Get appeal type ID by value (text)
+   */
+  getAppealTypeId(value: string): number | undefined {
+    const found = this.data.appealTypes.find(item => item.Value === value);
+    return found?.ID;
+  }
+
+  /**
+   * Get ticket type ID by value (text)
+   */
+  getTicketTypeId(value: string): number | undefined {
+    const found = this.data.ticketTypes.find(item => item.Value === value);
+    return found?.ID;
   }
 
   /**

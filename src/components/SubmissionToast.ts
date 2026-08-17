@@ -1,7 +1,7 @@
 import { TicketStateStore } from '../services/TicketStateStore';
 import { escapeHtml } from '../utils/security';
 import { wsnConfig } from '../config';
-import { WsnSubmitPayload } from '../types/wsn';
+import { WsnSubmitPayload } from '../types';
 import { generateWsnTicketId } from '../utils/wsn';
 
 export class SubmissionToastComponent {
@@ -31,15 +31,15 @@ export class SubmissionToastComponent {
       serviceAccount: wsnConfig.SERVICE_ACCOUNT,
       callId: result.callId,
       properties: {
-        [`${wsnConfig.PROPERTIES.APPEAL_TYPE}_appealType`]: formData.appealType,
-        [`${wsnConfig.PROPERTIES.TICKET_TYPE}_ticketType`]: formData.ticketType,
-        [`${wsnConfig.PROPERTIES.APPLICANT_NAME}_applicantName`]: formData.applicantName,
-        [`${wsnConfig.PROPERTIES.APPLICANT_ADDRESS}_applicantAddress`]: formData.applicantAddress,
-        [`${wsnConfig.PROPERTIES.ADDRESS_TEXT}_addressText`]: formData.addressText,
-        [`${wsnConfig.PROPERTIES.COORDINATES}_coordinates`]: formData.coordinates,
-        [`${wsnConfig.PROPERTIES.PHONE_NUMBER}_phoneNumber`]: formData.phoneNumber,
-        [`${wsnConfig.PROPERTIES.INCIDENT_DATE_TIME}_incidentDateTime`]: formData.incidentDateTime,
-        [`${wsnConfig.PROPERTIES.NOTES}_notes`]: formData.notes
+        [wsnConfig.PROPERTIES.APPEAL_TYPE]: formData.appealType,
+        [wsnConfig.PROPERTIES.TICKET_TYPE]: formData.ticketType,
+        [wsnConfig.PROPERTIES.APPLICANT_NAME]: formData.applicantName,
+        [wsnConfig.PROPERTIES.APPLICANT_ADDRESS]: formData.applicantAddress,
+        [wsnConfig.PROPERTIES.ADDRESS_TEXT]: formData.addressText,
+        [wsnConfig.PROPERTIES.COORDINATES]: formData.coordinates,
+        [wsnConfig.PROPERTIES.PHONE_NUMBER]: formData.phoneNumber,
+        [wsnConfig.PROPERTIES.INCIDENT_DATE_TIME]: formData.incidentDateTime,
+        [wsnConfig.PROPERTIES.NOTES]: formData.notes
       },
       confirmedAt: new Date().toISOString()
     };

@@ -1,5 +1,5 @@
 import { TicketStateStore } from '../services/TicketStateStore';
-import { ClarificationMode } from '../types/ticket';
+import { ClarificationMode } from '../types';
 import { escapeHtml } from '../utils/security';
 import { appConfig, speechConfig, uiConfig } from '../config';
 import { GeminiService } from '../services/GeminiService';
@@ -477,7 +477,7 @@ export class TranscriptPanelComponent {
     try {
       const gemini = GeminiService.getInstance();
       const result = await gemini.processAudio(blob, spokenText);
-      this.store.loadRealResult(result);
+      await this.store.loadRealResult(result);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       alert(`Помилка аналізу аудіо: ${errorMessage}`);
