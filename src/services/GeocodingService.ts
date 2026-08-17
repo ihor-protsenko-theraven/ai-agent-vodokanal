@@ -10,7 +10,7 @@
 
 import { geodataService } from './GeodataService';
 import { nominatimService } from './NominatimService';
-import { AddressSearchResult, GeocodingProvider } from '../types/geocoding';
+import { AddressSearchResult, GeocodingProvider } from '../types';
 
 class GeocodingService {
   private provider: GeocodingProvider = 'auto';
@@ -65,12 +65,27 @@ class GeocodingService {
    * Search address suggestions using the selected provider.
    * Used by the manual address search UI.
    */
-  async searchWithResults(addressStr: string): Promise<AddressSearchResult[]> {
+  async searchWithResults(addressStr: string, options: { resolveExact?: boolean } = {}): Promise<AddressSearchResult[]> {
     if (!addressStr || !addressStr.trim()) return [];
 
     if (this.provider === 'nominatim') {
-      const nominatim = await nominatimService.search(addressStr);
-      return nominatim ? [nominatim] : [];
+      return nominatimService.search(addressStr);
+    }
+
+    // A deliberate click on "Search" means the operator supplied a complete
+    // address, so resolve it through FullAddress first. This avoids treating
+    // a 404 from the autocomplete endpoint as an address-resolution failure.
+    if (options.resolveExact) {
+      const resolved = await geodataService.resolveAddress(addressStr);
+      if (resolved?.coordinates) {
+        return [{
+          item: {
+            ...resolved.address,
+            AddressString: resolved.address.AddressString || resolved.address.SourceAddress || addressStr
+          },
+          coords: resolved.coordinates
+        }];
+      }
     }
 
     const results: AddressSearchResult[] = [];
@@ -84,10 +99,7 @@ class GeocodingService {
     }
 
     if (results.length === 0 && this.provider === 'auto') {
-      const nominatim = await nominatimService.search(addressStr);
-      if (nominatim) {
-        results.push(nominatim);
-      }
+      results.push(...await nominatimService.search(addressStr));
     }
 
     return results;

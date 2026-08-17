@@ -3,7 +3,9 @@
  */
 
 export interface GeodataAddress {
+  ID?: number;
   Id?: number;
+  SourceAddress?: string | null;
   AddressString?: string | null;
   Index_?: string | null;
   Region?: string | null;
@@ -34,4 +36,35 @@ export interface GeodataAddress {
   Hromada?: string | null;
   Distance?: string | null;
   TerrStatus?: string | null;
+  Comments?: string | null;
+}
+
+/** Results returned by GET /api/Cities. */
+export interface GeodataCity {
+  st_moniker?: string | null;
+  City?: string | null;
+  Region?: string | null;
+  Area?: string | null;
+  SettlementType?: string | null;
+  Lat?: string | null;
+  Long?: string | null;
+}
+
+/** Results returned by GET /api/Streets for a selected city moniker. */
+export interface GeodataStreet {
+  house_moniker?: string | null;
+  Street?: string | null;
+  StrType?: string | null;
+  City?: string | null;
+}
+
+/** Results returned by GET /api/Houses for a selected street moniker. */
+export interface GeodataHouse {
+  HouseNum?: string | null;
+  HouseNumAdd?: string | null;
+  AddressString?: string | null;
+  Lat?: string | null;
+  Long?: string | null;
+  Lat_?: string | null;
+  Long_?: string | null;
 }

@@ -299,7 +299,7 @@ export class TicketFormPanelComponent {
               fieldKey: 'coordinates',
               value: formData.coordinates,
               type: 'input',
-              placeholder: `${geoConfig.DEFAULT_COORDINATES} (широта, довгота)`,
+                placeholder: 'Широта, довгота (визначаються за адресою)',
               confidenceKey: 'geocoding',
               confidenceScore: confidence.geocoding,
               isRequired: true
@@ -544,7 +544,10 @@ export class TicketFormPanelComponent {
     const btnGeoSearch = this.container.querySelector('#btn-geo-search');
     const geoSearchInput = this.container.querySelector<HTMLInputElement>('#geo-search-input');
     if (btnGeoSearch && geoSearchInput) {
-      const runSearch = () => this.handleAddressSearch(geoSearchInput.value || this.store.getFormData().addressText || '');
+      const runSearch = () => this.handleAddressSearch(
+        geoSearchInput.value || this.store.getFormData().addressText || '',
+        true
+      );
       btnGeoSearch.addEventListener('click', runSearch);
       geoSearchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -561,7 +564,7 @@ export class TicketFormPanelComponent {
         this.geoSearchTimer = window.setTimeout(() => {
           const query = geoSearchInput.value.trim();
           if (query.length >= uiConfig.GEO_SEARCH_MIN_CHARS) {
-            this.handleAddressSearch(query);
+            this.handleAddressSearch(query, false);
           } else if (query.length === 0) {
             this.clearGeoResults();
           }
@@ -587,9 +590,13 @@ export class TicketFormPanelComponent {
         btn.classList.remove('bg-slate-900', 'text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
 
         this.clearGeoResults();
+        // A previous lookup could have failed in another provider. Permit an
+        // immediate retry of the unchanged address through the newly selected one.
+        this.autoGeoAttempted = null;
+        this.scheduleAutoGeocode();
         const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
         if (input && input.value.trim().length >= uiConfig.GEO_SEARCH_MIN_CHARS) {
-          this.handleAddressSearch(input.value);
+          this.handleAddressSearch(input.value, false);
         }
       });
     });
@@ -662,7 +669,7 @@ export class TicketFormPanelComponent {
     }
   }
 
-  private async handleAddressSearch(rawQuery: string): Promise<void> {
+  private async handleAddressSearch(rawQuery: string, resolveExact: boolean = false): Promise<void> {
     const statusEl = this.container.querySelector('#geo-search-status');
     const resultsEl = this.container.querySelector('#geo-search-results');
     const query = rawQuery.trim();
@@ -684,7 +691,7 @@ export class TicketFormPanelComponent {
       return;
     }
 
-    const results = await geocodingService.searchWithResults(query);
+    const results = await geocodingService.searchWithResults(query, { resolveExact });
     this.lastGeoSearchResults = results;
 
     if (!resultsEl || !statusEl) return;
@@ -692,6 +699,13 @@ export class TicketFormPanelComponent {
     if (results.length === 0) {
       statusEl.textContent = 'Адресу не знайдено. Спробуйте уточнити запит (місто, вулиця, будинок).';
       statusEl.classList.remove('hidden');
+      return;
+    }
+
+    // A full-address search that returned one exact point needs no extra click.
+    // This also makes the separate "Пошук адреси" input behave like users expect.
+    if (resolveExact && results.length === 1 && results[0].coords) {
+      this.applyGeoResult(results[0]);
       return;
     }
 
@@ -712,11 +726,10 @@ export class TicketFormPanelComponent {
   }
 
   private applyGeoResult(result: AddressSearchResult): void {
-    if (result.item.AddressString) {
-      this.store.updateFormField('addressText', result.item.AddressString);
-    }
     if (result.coords) {
-      this.store.updateFormField('coordinates', result.coords);
+      this.store.applyGeocodedAddress(result.item.AddressString, result.coords);
+    } else if (result.item.AddressString) {
+      this.store.updateFormField('addressText', result.item.AddressString);
     }
   }
 

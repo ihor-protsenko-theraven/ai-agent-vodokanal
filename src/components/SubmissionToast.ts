@@ -1,6 +1,6 @@
 import { TicketStateStore } from '../services/TicketStateStore';
+import { getTicketNumber } from '../services/saveResult';
 import { escapeHtml } from '../utils/security';
-import { wsnConfig } from '../config';
 
 export class SubmissionToastComponent {
   private store: TicketStateStore;
@@ -18,10 +18,12 @@ export class SubmissionToastComponent {
       return;
     }
 
-    const submittedTicketId = this.store.getSubmittedTicketId();
-    const ticketReference = submittedTicketId == null
-      ? 'Номер заявки не повернувся у відповіді Forland.'
-      : `Номер заявки Forland: ${submittedTicketId}`;
+    const ticket = this.store.getSubmittedTicket();
+    const ticketNumber = getTicketNumber(ticket?.Title);
+    const primaryReference = ticketNumber ? `Заявка № ${ticketNumber}` : 'Заявку збережено';
+    const fallbackMessage = ticket == null
+      ? 'Forland підтвердив збереження, але не надав ідентифікатор заявки.'
+      : '';
 
     this.container.innerHTML = `
       <div class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
@@ -36,23 +38,37 @@ export class SubmissionToastComponent {
             </div>
             <div>
               <div class="flex items-center gap-2">
-                <h3 class="text-lg font-bold text-white">Заявку WSN успішно створено!</h3>
+                <h3 class="text-lg font-bold text-white">Заявку успішно створено</h3>
                 <span class="bg-emerald-500/20 text-emerald-300 font-mono text-xs px-2.5 py-0.5 rounded-full border border-emerald-500/40">
-                  Статус ${wsnConfig.DEFAULT_STATUS_ID}
+                  Збережено в WSN
                 </span>
               </div>
-              <p class="text-xs text-slate-300">
-                Заявка класу <strong class="text-sky-300">${wsnConfig.CLASS_ID}</strong> підтверджена API.
-                <span class="font-mono font-bold text-emerald-400">${escapeHtml(ticketReference)}</span>
-              </p>
+              <p class="text-xs text-slate-300">Forland підтвердив створення заявки.</p>
             </div>
+          </div>
+
+          <div class="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Номер заявки</p>
+              <p class="mt-1 text-xl font-bold text-emerald-300">${escapeHtml(primaryReference)}</p>
+            </div>
+            ${ticket?.ID != null ? `
+              <div class="sm:border-l sm:border-slate-700 sm:pl-4">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">WSN ID</p>
+                <p class="mt-1 font-mono text-base font-semibold text-slate-100">${ticket.ID}</p>
+              </div>
+            ` : ''}
+            ${ticket?.MetaID != null ? `
+              <p class="sm:col-span-2 text-xs text-slate-400">Клас заявки: <span class="font-mono text-sky-300">${ticket.MetaID}</span></p>
+            ` : ''}
+            ${fallbackMessage ? `<p class="sm:col-span-2 text-xs text-amber-300">${escapeHtml(fallbackMessage)}</p>` : ''}
           </div>
 
           <!-- Footer Actions -->
           <div class="flex items-center justify-between border-t border-slate-800 pt-4">
             <span class="text-xs text-slate-400">Персональні дані не виводяться у вікні підтвердження.</span>
             <button id="btn-close-toast" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-500/20">
-              Зрозуміло (Закрити)
+              Готово
             </button>
           </div>
         </div>

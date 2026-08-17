@@ -3,8 +3,8 @@
  * Handles authentication and repository data retrieval from Forland API
  *
  * Requests go through a same-origin proxy to avoid CORS:
- * - Dev:  Vite dev server proxy (/forland -> https://wsn1.forland-solution.com)
- * - Prod: Vercel serverless function (/api/forland)
+ * - Vite:       Vite dev-server proxy (/forland -> https://wsn1.forland-solution.com)
+ * - Vercel:     serverless function (/api/forland), in production and `vercel dev`
  */
 
 import { apiConfig } from '../config';
@@ -24,7 +24,7 @@ import {
 import { toUnclosedTicketSummary } from './forlandTicketSummary';
 
 class ForlandApiService {
-  private baseUrl: string = import.meta.env.DEV ? '/forland' : '/api/forland';
+  private baseUrl: string = apiConfig.FORLAND.PROXY_BASE_PATH;
   private authToken: string | null = null;
 
   /**

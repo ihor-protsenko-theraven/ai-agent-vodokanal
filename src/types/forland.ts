@@ -57,6 +57,8 @@ export type GetListResponse = GetListItem[];
 export interface UnclosedTicketSummary {
   id: number;
   title: string;
+  /** ISO timestamp derived from the Forland LogID, or the date in the title. */
+  createdAt?: string;
   addressText: string;
   coordinates: string;
   logId?: string | number;
@@ -102,6 +104,14 @@ export interface SaveRequest {
   onlyAllSave?: boolean;
 }
 
+/** A unit actually created or updated by POST /Unit/Save. */
+export interface SavedUnit {
+  ID?: number;
+  Title?: string;
+  MetaID?: number;
+  LogID?: string;
+}
+
 export interface SaveResponse {
   transportStatus?: number;
   success?: boolean;
@@ -113,4 +123,6 @@ export interface SaveResponse {
   Error?: string;
   InnerExceptions?: string;
   ErrorMessage?: string;
+  units?: SavedUnit[];
+  countSaved?: number;
 }

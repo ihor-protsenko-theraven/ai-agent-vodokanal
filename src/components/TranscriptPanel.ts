@@ -303,7 +303,16 @@ export class TranscriptPanelComponent {
     if (!list) return;
 
     const result = this.store.getResult();
-    const transcriptLines = result.transcript.split('\n').filter(l => l.trim().length > 0);
+    const transcript = typeof result.transcript === 'string' ? result.transcript : '';
+    const transcriptLines = transcript.split('\n').filter(l => l.trim().length > 0);
+
+    if (transcriptLines.length === 0) {
+      const emptyState = '<p class="text-sm text-slate-500 italic text-center py-8">Транскрипт з’явиться після обробки аудіо.</p>';
+      if (list.innerHTML !== emptyState) {
+        list.innerHTML = emptyState;
+      }
+      return;
+    }
 
     const newHTML = transcriptLines.map((line) => {
       const isAI = line.includes('AI-Агент');
@@ -470,11 +479,11 @@ export class TranscriptPanelComponent {
     this.audioPlayer.src = this.currentAudioUrl;
     this.audioPlayer.load();
 
-    this.store.setIsProcessingAudio(true);
-    // Overlay updates automatically via subscription, but calling explicitly is safe too
-    this.updateProcessingOverlay();
-
     try {
+      this.store.setIsProcessingAudio(true);
+      // Overlay updates automatically via subscription, but calling explicitly is safe too
+      this.updateProcessingOverlay();
+
       const gemini = GeminiService.getInstance();
       const result = await gemini.processAudio(blob, spokenText);
       await this.store.loadRealResult(result);

@@ -1,5 +1,5 @@
-import { AgentProcessingResult, TicketDuplicate } from '../types/ticket';
-import { aiConfig, geoConfig, nlpConfig, speechConfig, wsnConfig } from '../config';
+import { AgentProcessingResult, TicketDuplicate } from '../types';
+import { aiConfig, nlpConfig, speechConfig, wsnConfig } from '../config';
 import { geocodingService } from './GeocodingService';
 import { AppealTypeClassifier } from './nlp/AppealTypeClassifier';
 import { PhoneExtractor } from './nlp/PhoneExtractor';
@@ -113,13 +113,6 @@ export class VoiceDictationService {
       coordinates = (await geocodingService.getCoordinates(addressText)) ?? '';
     }
 
-    if (!coordinates) {
-      coordinates =
-        detectedCity === geoConfig.VINNYTSIA_CITY_NAME
-          ? geoConfig.VINNYTSIA_COORDINATES
-          : geoConfig.DEFAULT_COORDINATES;
-    }
-
     // 4. Calculate Confidence Scores & Manual Review Status (Scenario 3: Unclear Location -> Low Confidence)
     const hasValidAddress = extractedAddress.hasStreet && extractedAddress.hasHouseNumber && !isVagueLocation;
     const addressConfidence = isVagueLocation
@@ -130,11 +123,9 @@ export class VoiceDictationService {
       ? aiConfig.CONFIDENCE_SCORES.ADDRESS_STREET_ONLY
       : aiConfig.CONFIDENCE_SCORES.ADDRESS_LOW;
 
-    const geoConfidence = isVagueLocation
-      ? aiConfig.CONFIDENCE_SCORES.GEOCODING_VAGUE
-      : coordinates && coordinates !== geoConfig.DEFAULT_COORDINATES
+    const geoConfidence = coordinates
       ? aiConfig.CONFIDENCE_SCORES.GEOCODING_FULL
-      : aiConfig.CONFIDENCE_SCORES.GEOCODING_FALLBACK;
+      : aiConfig.CONFIDENCE_SCORES.GEOCODING_VAGUE;
 
     const speechConfidence = text.length > aiConfig.SHORT_SPEECH_THRESHOLD
       ? aiConfig.CONFIDENCE_SCORES.SPEECH_DEFAULT

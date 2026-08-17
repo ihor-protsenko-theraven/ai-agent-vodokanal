@@ -1,7 +1,7 @@
 
-import { AgentProcessingResult } from '../types/ticket';
-import { GeminiContentPart, GeminiResponse } from '../types/gemini';
-import { aiConfig, apiConfig, geoConfig, speechConfig, wsnConfig } from '../config';
+import { AgentProcessingResult, WsnTicketData } from '../types';
+import { GeminiContentPart, GeminiResponse } from '../types';
+import { aiConfig, apiConfig, nlpConfig, speechConfig, wsnConfig } from '../config';
 import { SCENARIO_HIGH_CONFIDENCE, SCENARIO_DUPLICATE_FOUND, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
 import { VoiceDictationService } from './VoiceDictationService';
 import { geocodingService } from './GeocodingService';
@@ -9,6 +9,32 @@ import { AppealTypeClassifier } from './nlp/AppealTypeClassifier';
 import { ApplicantNameExtractor } from './nlp/ApplicantNameExtractor';
 import { PhoneExtractor } from './nlp/PhoneExtractor';
 import { UkrainianAddressParser } from './nlp/UkrainianAddressParser';
+import { formatDateTimeInput, generateCallId } from '../utils/wsn';
+import { capitalizeFirst } from '../utils/text';
+
+function asFiniteScore(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+const NAME_STOP_WORDS = new Set([
+  'мій', 'моя', 'моє', 'номер', 'телефон', 'контакт', 'адреса',
+  'проживаю', 'живу', 'заявник', 'заявника', 'я', 'мене'
+]);
+
+function normalizeIncidentDateTime(value: unknown, fallback: Date): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatDateTimeInput(value);
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = new Date(value.trim());
+    if (!Number.isNaN(parsed.getTime())) {
+      return formatDateTimeInput(parsed);
+    }
+  }
+
+  return formatDateTimeInput(fallback);
+}
 
 export class GeminiService {
   private static instance: GeminiService;
@@ -88,6 +114,12 @@ export class GeminiService {
         }
 
         console.warn(`[Gemini] Model ${modelName} returned status ${res.status}`);
+        // Invalid credentials (401/403) and invalid payloads (400) cannot be
+        // fixed by retrying a different model. Stop to avoid noisy duplicate
+        // requests; the caller will use the local parser as its safe fallback.
+        if ([400, 401, 403].includes(res.status)) {
+          return null;
+        }
       } catch (e) {
         console.warn(`[Gemini] Fetch error for ${modelName}:`, e);
       }
@@ -101,9 +133,7 @@ export class GeminiService {
     const mimeType = audioBlob.type || speechConfig.DEFAULT_AUDIO_MIME_TYPE;
     const parts: GeminiContentPart[] = [{ text: aiConfig.PROMPTS.SYSTEM }];
 
-    if (spokenText?.trim()) {
-      parts.push({ text: `Spoken Text Transcript: "${spokenText}"` });
-    }
+    parts.push({ text: this.buildCallContext(spokenText) });
 
     if (base64Audio.length > apiConfig.GEMINI.MIN_AUDIO_BASE64_LENGTH) {
       parts.push({
@@ -117,8 +147,19 @@ export class GeminiService {
   private buildTextPayload(spokenText: string): GeminiContentPart[] {
     return [
       { text: aiConfig.PROMPTS.SYSTEM },
-      { text: `Analyze spoken Ukrainian call transcript: "${spokenText}"` }
+      { text: this.buildCallContext(spokenText) }
     ];
+  }
+
+  private buildCallContext(spokenText?: string): string {
+    const transcript = spokenText?.trim();
+    return [
+      `CALL_CAPTURED_AT: ${new Date().toISOString()}`,
+      'Мова дзвінка: українська.',
+      transcript
+        ? `Транскрипт, розпізнаний браузером: "${transcript}"`
+        : 'Використай прикріплений аудіозапис як єдине джерело змісту дзвінка.'
+    ].join('\n');
   }
 
   private async executeLocalFallback(spokenText?: string): Promise<AgentProcessingResult> {
@@ -138,18 +179,45 @@ export class GeminiService {
         cleanJson = cleanJson.replace(pattern, '');
       }
       cleanJson = cleanJson.trim();
-      parsedResult = JSON.parse(cleanJson) as AgentProcessingResult;
+      const modelResult = JSON.parse(cleanJson) as Partial<AgentProcessingResult>;
 
-      // Basic structure validation
-      if (!parsedResult || !parsedResult.ticket) {
+      // Gemini's schema deliberately returns ticket fields, not UI-only fields
+      // such as callId and transcript. Validate the external payload, then add
+      // those application fields deterministically below.
+      if (!modelResult || typeof modelResult !== 'object' || !modelResult.ticket || typeof modelResult.ticket !== 'object') {
         throw new Error('Invalid JSON structure returned from Gemini');
       }
+
+      const transcriptSource = spokenText?.trim() || modelResult.ticket.notes || '';
+      parsedResult = {
+        callId: typeof modelResult.callId === 'string' && modelResult.callId.trim()
+          ? modelResult.callId
+          : generateCallId(nlpConfig.CALL_ID_PREFIX),
+        transcript: typeof modelResult.transcript === 'string' && modelResult.transcript.trim()
+          ? modelResult.transcript
+          : nlpConfig.TRANSCRIPT_TEMPLATE(String(transcriptSource)),
+        ticket: modelResult.ticket as Partial<WsnTicketData>,
+        confidence: {
+          speechRecognition: asFiniteScore(modelResult.confidence?.speechRecognition),
+          classification: asFiniteScore(modelResult.confidence?.classification),
+          addressExtraction: asFiniteScore(modelResult.confidence?.addressExtraction),
+          geocoding: asFiniteScore(modelResult.confidence?.geocoding)
+        },
+        requiresManualReview: modelResult.requiresManualReview === true,
+        suggestedQuestions: Array.isArray(modelResult.suggestedQuestions)
+          ? modelResult.suggestedQuestions.filter((question): question is string => typeof question === 'string')
+          : [],
+        duplicatesFound: Array.isArray(modelResult.duplicatesFound) ? modelResult.duplicatesFound : [],
+        requiresTicketRegistration: modelResult.requiresTicketRegistration !== false
+      };
     } catch (e) {
       console.warn('[Gemini] JSON Parse error, falling back.', e);
       return this.executeLocalFallback(spokenText);
     }
 
     const ticket = parsedResult.ticket;
+    ticket.applicantName = this.normalizeApplicantName(ticket.applicantName);
+    ticket.incidentDateTime = normalizeIncidentDateTime(ticket.incidentDateTime, new Date());
 
     // Deterministic corrections over the LLM output: keep values in sync with
     // the actual dropdowns and fix name / phone / address using local extractors.
@@ -181,9 +249,7 @@ export class GeminiService {
       }
     }
 
-    const hasNoCoords = !ticket.coordinates || !ticket.coordinates.trim();
-
-    if (ticket.addressText && hasNoCoords) {
+    if (ticket.addressText?.trim()) {
       const coords = await geocodingService.getCoordinates(ticket.addressText);
       if (coords) {
         ticket.coordinates = coords;
@@ -194,16 +260,41 @@ export class GeminiService {
           parsedResult.confidence.geocoding,
           aiConfig.HIGH_CONFIDENCE_THRESHOLD
         );
+      } else {
+        // Never retain coordinates inferred by a model or use a fixed fallback.
+        // The WSN draft may be saved only after an address API result or a
+        // deliberate operator correction.
+        ticket.coordinates = '';
+        parsedResult.confidence.geocoding = Math.min(
+          parsedResult.confidence.geocoding,
+          aiConfig.CONFIDENCE_SCORES.GEOCODING_VAGUE
+        );
+        parsedResult.requiresManualReview = true;
       }
-    }
-
-    // Default coordinates for mandatory registration
-    if (parsedResult.requiresTicketRegistration && (!ticket.coordinates || !ticket.coordinates.trim())) {
-      ticket.coordinates = geoConfig.DEFAULT_COORDINATES;
     }
 
     parsedResult.duplicatesFound = parsedResult.duplicatesFound || [];
     return parsedResult;
+  }
+
+  private normalizeApplicantName(value: unknown): string {
+    if (typeof value !== 'string' || !value.trim()) return '';
+
+    const raw = value.trim();
+    const withoutIntroduction = raw.replace(
+      /^(?:мене\s+зв(?:ати|уть)|звати\s+мене|я\s+|це\s+)/iu,
+      ''
+    );
+    const words = withoutIntroduction.match(/[\p{L}][\p{L}'’-]*/gu) ?? [];
+    const firstStopWord = words.findIndex(word => NAME_STOP_WORDS.has(word.toLocaleLowerCase('uk-UA')));
+    const nameWords = (firstStopWord === -1 ? words : words.slice(0, firstStopWord)).slice(0, 3);
+
+    if (nameWords.length > 0 && !NAME_STOP_WORDS.has(nameWords[0].toLocaleLowerCase('uk-UA'))) {
+      return nameWords.map(capitalizeFirst).join(' ');
+    }
+
+    const extracted = this.nameExtractor.extract(raw);
+    return extracted === speechConfig.DEFAULT_APPLICANT_NAME ? '' : extracted;
   }
 
   private getMockFallbackResult(): AgentProcessingResult {

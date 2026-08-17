@@ -1,10 +1,6 @@
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const ALLOWED_MODELS = new Set([
-  'gemini-1.5-flash-latest',
-  'gemini-2.5-flash',
-  'gemini-1.5-pro',
-  'gemini-2.0-flash-exp',
-  'gemini-1.5-flash-8b'
+  'gemini-2.5-flash'
 ]);
 const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 
@@ -53,8 +49,16 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    return sendJson(res, 503, { error: 'Gemini integration is not configured' });
+  // GEMINI_API_KEY is the preferred server-only name. The VITE-prefixed value
+  // is supported temporarily so existing Vercel Preview/Production settings
+  // continue to work while the project configuration is migrated.
+  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return sendJson(res, 503, {
+      error: 'Gemini integration is not configured',
+      message: 'Missing GEMINI_API_KEY or legacy VITE_GEMINI_API_KEY for this environment'
+    });
   }
 
   const contentLength = Number(req.headers['content-length']);
@@ -69,10 +73,13 @@ export default async function handler(req, res) {
     }
 
     const upstream = await fetch(
-      `${GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`,
+      `${GEMINI_BASE_URL}/models/${encodeURIComponent(model)}:generateContent`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {

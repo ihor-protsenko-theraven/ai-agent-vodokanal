@@ -15,6 +15,12 @@ describe('ticket draft rules', () => {
     expect(result.duplicatesFound).toEqual([]);
   });
 
+  it('fills the incident time when an AI draft returns an empty value', () => {
+    const formData = toTicketFormData({ incidentDateTime: '' });
+
+    expect(formData.incidentDateTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  });
+
   it('blocks saving when the duplicate check is unavailable', () => {
     const result = createEmptyTicketResult();
     result.ticket.coordinates = '50.4501, 30.5234';

@@ -8,12 +8,13 @@ import {
   WsnTicketData
 } from '../types';
 import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '../mock/mockData';
-import { authConfig, aiConfig, wsnConfig, uiConfig } from '../config';
+import { apiConfig, authConfig, aiConfig, wsnConfig, uiConfig } from '../config';
 import { forlandApiService } from './ForlandApiService';
 import { dropdownDataService } from './DropdownDataService';
 import { DuplicateFinder } from './DuplicateFinder';
-import { isSaveSuccessful } from './saveResult';
-import { CreateNewUnitResponse } from '../types';
+import { getSavedUnit, isSaveSuccessful } from './saveResult';
+import { CreateNewUnitResponse, SavedUnit } from '../types';
+import { sortUnclosedTickets, UnclosedTicketSort } from './forlandTicketSummary';
 import { formatForlandDateTimeMinutePrecision, formatForlandDateTimeMinutePrecisionWithTimezone } from '../utils/wsn';
 import {
   createEmptyTicketResult,
@@ -37,7 +38,7 @@ export class TicketStateStore {
   private isCallIntercepted: boolean = false;
   private selectedDuplicate: TicketDuplicate | null = null;
   private isSubmitted: boolean = false;
-  private submittedTicketId: number | null = null;
+  private submittedTicket: SavedUnit | null = null;
   private newTicketTemplate: CreateNewUnitResponse | null = null;
   private isPreparingNewTicket: boolean = false;
   private isCheckingDuplicates: boolean = false;
@@ -48,6 +49,7 @@ export class TicketStateStore {
   private unclosedTicketsError: string | null = null;
   private isLoadingUnclosedTickets: boolean = false;
   private isUnclosedTicketsPanelOpen: boolean = false;
+  private unclosedTicketsSort: UnclosedTicketSort = 'newest';
   private unclosedTicketsRequest: Promise<boolean> | null = null;
 
   private duplicateFinder = new DuplicateFinder();
@@ -85,7 +87,15 @@ export class TicketStateStore {
   }
 
   private notify(): void {
-    this.listeners.forEach(listener => listener());
+    this.listeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        // A rendering failure in one panel must not interrupt an in-flight
+        // Forland or geocoding operation triggered by another state change.
+        console.error('Ticket state listener failed:', error);
+      }
+    });
   }
 
   public loadScenario(scenarioId: string): void {
@@ -99,7 +109,7 @@ export class TicketStateStore {
       this.isCallIntercepted = false;
       this.selectedDuplicate = null;
       this.isSubmitted = false;
-      this.submittedTicketId = null;
+      this.submittedTicket = null;
       this.newTicketTemplate = null;
       this.notify();
     }
@@ -128,7 +138,7 @@ export class TicketStateStore {
     this.isCallIntercepted = false;
     this.selectedDuplicate = null;
     this.isSubmitted = false;
-    this.submittedTicketId = null;
+    this.submittedTicket = null;
     this.newTicketTemplate = null;
     this.notify();
   }
@@ -226,7 +236,11 @@ export class TicketStateStore {
   }
 
   public getSubmittedTicketId(): number | null {
-    return this.submittedTicketId;
+    return this.submittedTicket?.ID ?? null;
+  }
+
+  public getSubmittedTicket(): SavedUnit | null {
+    return this.submittedTicket;
   }
 
   public getIsProcessingAudio(): boolean {
@@ -243,6 +257,20 @@ export class TicketStateStore {
 
   public getUnclosedTickets(): readonly UnclosedTicketSummary[] {
     return this.unclosedTickets;
+  }
+
+  public getSortedUnclosedTickets(): readonly UnclosedTicketSummary[] {
+    return sortUnclosedTickets(this.unclosedTickets, this.unclosedTicketsSort);
+  }
+
+  public getUnclosedTicketsSort(): UnclosedTicketSort {
+    return this.unclosedTicketsSort;
+  }
+
+  public setUnclosedTicketsSort(sort: UnclosedTicketSort): void {
+    if (this.unclosedTicketsSort === sort) return;
+    this.unclosedTicketsSort = sort;
+    this.notify();
   }
 
   public getUnclosedTicketsUpdatedAt(): Date | null {
@@ -300,7 +328,10 @@ export class TicketStateStore {
         return true;
       } catch (error) {
         console.error('Unable to load unclosed tickets from Forland:', error);
-        this.unclosedTicketsError = 'Не вдалося завантажити незакриті заявки з Forland.';
+        const startCommand = apiConfig.FORLAND.PROXY_BASE_PATH === '/api/forland'
+          ? 'npx vercel dev'
+          : 'npm run dev';
+        this.unclosedTicketsError = `Не вдалося з’єднатися з проксі Forland (${apiConfig.FORLAND.PROXY_BASE_PATH}). Перевірте, що запущено ${startCommand}, і оновіть сторінку.`;
         return false;
       } finally {
         this.isLoadingUnclosedTickets = false;
@@ -341,7 +372,7 @@ export class TicketStateStore {
       this.isCallIntercepted = false;
       this.selectedDuplicate = null;
       this.isSubmitted = false;
-      this.submittedTicketId = null;
+      this.submittedTicket = null;
       return true;
     } catch (error) {
       console.error('Failed to prepare a new Forland ticket:', error);
@@ -362,6 +393,23 @@ export class TicketStateStore {
     if (notify) {
       this.notify();
     }
+  }
+
+  /** Apply coordinates returned by an address provider, rather than unverified text input. */
+  public applyGeocodedAddress(addressText: string | null | undefined, coordinates: string): void {
+    if (addressText?.trim()) {
+      this.formData.addressText = addressText.trim();
+      this.result.duplicatesFound = [];
+      this.result.duplicateCheckStatus = 'REQUIRED';
+    }
+
+    this.formData.coordinates = coordinates;
+    this.result.confidence.geocoding = Math.max(
+      this.result.confidence.geocoding,
+      aiConfig.CONFIDENCE_SCORES.GEOCODING_FULL
+    );
+    this.verifications.coordinates = true;
+    this.notify();
   }
 
   public async checkDuplicates(notify: boolean = true): Promise<boolean> {
@@ -572,7 +620,7 @@ export class TicketStateStore {
 
       if (isSaveSuccessful(saveResult)) {
         this.isSubmitted = true;
-        this.submittedTicketId = saveResult?.ID ?? null;
+        this.submittedTicket = getSavedUnit(saveResult);
         this.newTicketTemplate = null;
         this.notify();
         return true;
@@ -589,7 +637,7 @@ export class TicketStateStore {
 
   public resetSubmission(): void {
     this.isSubmitted = false;
-    this.submittedTicketId = null;
+    this.submittedTicket = null;
     this.notify();
   }
 }

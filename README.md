@@ -189,6 +189,28 @@ To use real Gemini during local integration testing, set
 `/api/gemini` function and has `GEMINI_API_KEY` configured. Do not put the key
 in a `VITE_*` variable.
 
+For that mode, run the local Vercel runtime rather than Vite and make both
+routes use its serverless functions:
+
+```powershell
+# .env.development.local (gitignored), or Vercel Development environment variables
+VITE_AI_MODE=gemini
+VITE_FORLAND_PROXY_MODE=vercel
+
+npx vercel dev
+```
+
+`npm run dev` uses `VITE_FORLAND_PROXY_MODE=vite`, where `/forland` is handled
+by `vite.config.ts`. `vercel dev` uses `VITE_FORLAND_PROXY_MODE=vercel`, where
+both Gemini and Forland are handled by `/api/*`. Restart the server after
+changing either `VITE_*` variable.
+
+In Vercel, prefer `GEMINI_API_KEY` as a **sensitive** variable for Development,
+Preview and Production. The server supports the legacy `VITE_GEMINI_API_KEY`
+name during migration, but it must also be present in Development for
+`vercel dev` to use it. Add `VITE_FORLAND_PROXY_MODE=vercel` for Development
+when using `vercel dev`.
+
 ### 4. Build for Production
 ```bash
 npm run build
@@ -212,8 +234,8 @@ Required environment variables (configure them only in Vercel; do not expose the
 The project includes a pre-configured Vercel build setup (`vercel.json`) and a serverless function for Forland API proxy (`api/forland.js`).
 
 ### Development
-- Uses Vite dev server proxy for Forland API (`/forland` -> `https://wsn1.forland-solution.com`)
-- Configure in `vite.config.ts`
+- `npm run dev`: Vite proxy for Forland (`/forland` -> `https://wsn1.forland-solution.com`)
+- `npx vercel dev`: local Vercel functions for both `/api/forland` and `/api/gemini`
 
 ### Production Deployment
 1. Import your GitHub repository into the [Vercel Dashboard](https://vercel.com/new).

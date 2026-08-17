@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatForlandAddress, formatForlandCoordinates, toUnclosedTicketSummary } from './forlandTicketSummary';
+import { formatForlandAddress, formatForlandCoordinates, sortUnclosedTickets, toUnclosedTicketSummary } from './forlandTicketSummary';
 
 describe('Forland active-ticket summary', () => {
   it('converts POINT(longitude latitude) WKT into the form coordinate format', () => {
@@ -19,7 +19,7 @@ describe('Forland active-ticket summary', () => {
       ID: 42,
       Title: 'Аварія на мережі',
       MetaID: 27772,
-      LogID: 'log-42',
+      LogID: '639225979145900000',
       Init: {
         Properties: {
           f_389: 'м. Київ, вул. Хрещатик, 15',
@@ -30,10 +30,22 @@ describe('Forland active-ticket summary', () => {
     })).toEqual({
       id: 42,
       title: 'Аварія на мережі',
+      createdAt: '2026-08-17T21:11:54.590Z',
       addressText: 'м. Київ, вул. Хрещатик, 15',
       coordinates: '50.4501, 30.5234',
       metaId: 27772,
-      logId: 'log-42'
+      logId: '639225979145900000'
     });
+  });
+
+  it('sorts tickets by the creation timestamp and puts unknown dates last', () => {
+    const tickets = [
+      { id: 1, title: 'Без дати', addressText: '', coordinates: '' },
+      { id: 2, title: 'Стара', createdAt: '2026-08-17T10:00:00.000Z', addressText: '', coordinates: '' },
+      { id: 3, title: 'Нова', createdAt: '2026-08-18T10:00:00.000Z', addressText: '', coordinates: '' }
+    ];
+
+    expect(sortUnclosedTickets(tickets, 'newest').map((ticket) => ticket.id)).toEqual([3, 2, 1]);
+    expect(sortUnclosedTickets(tickets, 'oldest').map((ticket) => ticket.id)).toEqual([2, 3, 1]);
   });
 });

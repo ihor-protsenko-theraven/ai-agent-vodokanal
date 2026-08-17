@@ -7,6 +7,7 @@ import { aiConfig, wsnConfig } from '../config';
 import { formatDateTimeInput, generateCallId } from '../utils/wsn';
 
 export function toTicketFormData(ticketPartial: Partial<WsnTicketData>): WsnTicketData {
+  const incidentDateTime = ticketPartial.incidentDateTime;
   return {
     appealType: ticketPartial.appealType ?? '',
     ticketType: ticketPartial.ticketType ?? '',
@@ -15,7 +16,11 @@ export function toTicketFormData(ticketPartial: Partial<WsnTicketData>): WsnTick
     addressText: ticketPartial.addressText ?? '',
     coordinates: ticketPartial.coordinates ?? '',
     phoneNumber: ticketPartial.phoneNumber ?? '',
-    incidentDateTime: ticketPartial.incidentDateTime ?? formatDateTimeInput(new Date()),
+    incidentDateTime: typeof incidentDateTime === 'string' && incidentDateTime.trim()
+      ? incidentDateTime
+      : incidentDateTime instanceof Date
+      ? incidentDateTime
+      : formatDateTimeInput(new Date()),
     notes: ticketPartial.notes ?? ''
   };
 }
@@ -62,7 +67,9 @@ export function isLowConfidenceField(
     case 'addressText':
       return confidence.addressExtraction < aiConfig.CONFIDENCE_THRESHOLD || requiresReview;
     case 'coordinates':
-      return confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD || requiresReview;
+      // An exact point selected from a geocoder is independently verifiable,
+      // even when another field still requires the operator's review.
+      return confidence.geocoding < aiConfig.CONFIDENCE_THRESHOLD;
     case 'notes':
       return confidence.speechRecognition < aiConfig.CONFIDENCE_THRESHOLD || requiresReview;
   }
