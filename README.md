@@ -86,64 +86,18 @@ ai-agent-vodokanal/
 ├── api/
 │   ├── forland.js                # Vercel serverless function for Forland API proxy
 │   └── gemini.js                 # Server-side Gemini proxy
-├── public/
-│   └── assets/
-│       └── scenarios/            # Text files for test call scenarios
 ├── src/
-│   ├── components/               # Modular UI components
-│   │   ├── DuplicateModal.ts     # Duplicate ticket warning modal
-│   │   ├── Header.ts             # Application header (status, scenarios, API key)
-│   │   ├── LoginPage.ts          # Operator login form
-│   │   ├── SubmissionToast.ts    # Success/cancellation toast notifications
-│   │   ├── TicketFormPanel.ts    # WSN Class 27772 ticket creation form
-│   │   └── TranscriptPanel.ts    # Audio transcript & voice dictation panel
-│   ├── config/                   # Configuration files
-│   │   ├── ai.config.ts          # AI prompts, models, and confidence thresholds
-│   │   ├── api.config.ts         # API endpoints and paths
-│   │   ├── app.config.ts         # Application settings
-│   │   ├── auth.config.ts        # Authentication configuration
-│   │   ├── geo.config.ts         # Geocoding service settings
-│   │   ├── nlp.config.ts         # NLP processing constants (Ukrainian)
-│   │   ├── speech.config.ts      # Speech recognition settings
-│   │   ├── ui.config.ts          # UI component configuration
-│   │   ├── wsn.config.ts         # WSN domain mapping and attributes
-│   │   └── index.ts              # Config exports
-│   ├── mock/
-│   │   └── mockData.ts           # Mock data for testing
-│   ├── services/                 # Business logic and API services
-│   │   ├── nlp/                  # NLP processing services
-│   │   │   ├── AppealTypeClassifier.ts      # Appeal type classification
-│   │   │   ├── ApplicantNameExtractor.ts   # Name extraction logic
-│   │   │   ├── PhoneExtractor.ts            # Phone number extraction
-│   │   │   ├── QuestionGenerator.ts         # Dynamic question generation
-│   │   │   └── UkrainianAddressParser.ts    # Ukrainian address parsing
-│   │   ├── DropdownDataService.ts  # Dropdown data management
-│   │   ├── DuplicateFinder.ts        # Duplicate detection logic
-│   │   ├── ForlandApiService.ts      # Forland API integration
-│   │   ├── GeminiService.ts          # Google Gemini API integration
-│   │   ├── GeocodingService.ts       # Geocoding service orchestration
-│   │   ├── GeodataService.ts        # Geodata management
-│   │   ├── NominatimService.ts       # OpenStreetMap Nominatim API
-│   │   ├── TicketStateStore.ts       # Central reactive state store (Singleton)
-│   │   └── VoiceDictationService.ts  # Speech recognition service
-│   ├── types/                    # TypeScript interfaces and data models
-│   │   ├── dropdown.ts           # Dropdown data types
-│   │   ├── forland.ts            # Forland API types
-│   │   ├── gemini.ts             # Gemini API types
-│   │   ├── geocoding.ts          # Geocoding types
-│   │   ├── geodata.ts            # Geodata types
-│   │   ├── index.ts              # Type exports
-│   │   ├── nlp.ts                # NLP processing types
-│   │   ├── ticket.ts             # Ticket data models
-│   │   ├── ui.ts                 # UI component types
-│   │   └── wsn.ts                # WSN domain types
-│   ├── utils/                    # Utility functions
-│   │   ├── security.ts           # Security utilities
-│   │   ├── text.ts               # Text processing utilities
-│   │   └── wsn.ts                # WSN-specific utilities
-│   ├── app.ts                    # Main UI controller & layout switcher
-│   ├── main.ts                   # Vite application entry point
-│   └── style.css                 # Custom CSS & Tailwind directives
+│   ├── app/                      # Bootstrap, application shell, UI state/session
+│   ├── features/
+│   │   ├── tickets/              # Form, duplicates, unclosed ticket drawer
+│   │   ├── voice/                # Gemini, local NLP and transcript UI
+│   │   ├── geocoding/            # Geodata and Nominatim adapters
+│   │   └── forland/              # API client and Forland request mapping
+│   ├── shared/                   # Config, domain/API types, pure utilities
+│   ├── main.ts                   # Vite entry point
+│   └── style.css                 # Global CSS and Tailwind directives
+├── docs/
+│   └── ARCHITECTURE.md           # Module boundaries and import rules
 ├── .env.example                  # Environment variables template
 ├── index.html                    # Base HTML layout
 ├── package.json                  # Dependencies & npm scripts
@@ -152,6 +106,9 @@ ai-agent-vodokanal/
 ├── vite.config.ts                # Vite configuration
 └── vercel.json                   # Vercel deployment configuration
 ```
+
+The source tree follows a feature-first architecture. More precise boundaries
+and import rules are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 

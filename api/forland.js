@@ -20,6 +20,10 @@ const STRIP_HEADERS = new Set([
   'upgrade',
   'host',
   'accept-encoding',
+  // Node/Vercel fetch transparently decodes the upstream body. Forwarding the
+  // original Content-Encoding would make the browser attempt a second decode
+  // and fail with ERR_CONTENT_DECODING_FAILED despite HTTP 200.
+  'content-encoding',
   'content-length'
 ]);
 
