@@ -1,4 +1,6 @@
 export { appConfig } from './app.config';
+export { buildInfo, getBuildBadgeLabel, getBuildDetails } from './buildInfo';
+export type { BuildInfo, DeploymentEnvironment } from './buildInfo';
 export { authConfig } from './auth.config';
 export { aiConfig } from './ai.config';
 export { apiConfig, resolveForlandProxyBasePath } from './api.config';

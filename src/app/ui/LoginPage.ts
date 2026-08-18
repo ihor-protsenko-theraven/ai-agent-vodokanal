@@ -1,5 +1,5 @@
 import { TicketStateStore } from '@/app/state/TicketStateStore';
-import { appConfig, uiConfig } from '@/shared/config';
+import { appConfig, getBuildBadgeLabel, getBuildDetails, uiConfig } from '@/shared/config';
 import { escapeHtml } from '@/shared/utils/security';
 
 export class LoginPageComponent {
@@ -30,6 +30,9 @@ export class LoginPageComponent {
               <p class="text-xs text-sky-400 font-semibold tracking-wide uppercase mt-1">
                 ${escapeHtml(appConfig.SUBTITLE)}
               </p>
+              <span title="${escapeHtml(getBuildDetails())}" class="inline-block mt-2 text-[10px] font-mono text-slate-400 border border-slate-700 rounded px-2 py-0.5 cursor-help">
+                ${escapeHtml(getBuildBadgeLabel())}
+              </span>
             </div>
           </div>
 

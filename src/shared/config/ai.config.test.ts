@@ -9,11 +9,11 @@ describe('AI runtime mode', () => {
     expect(resolveAiMode(undefined)).toBe('gemini');
   });
 
-  it('uses Gemini Flash with two compatible Flash-Lite fallbacks', () => {
-    expect(aiConfig.GEMINI_MODEL).toBe('gemini-2.5-flash');
+  it('uses the selected high-quality Flash models with a Flash-Lite fallback', () => {
+    expect(aiConfig.GEMINI_MODEL).toBe('gemini-3.7-flash');
     expect(aiConfig.GEMINI_CANDIDATE_MODELS).toEqual([
-      'gemini-2.5-flash-lite',
-      'gemini-3.1-flash-lite'
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite'
     ]);
   });
 

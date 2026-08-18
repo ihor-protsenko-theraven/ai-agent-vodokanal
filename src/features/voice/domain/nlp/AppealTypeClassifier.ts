@@ -30,39 +30,99 @@ export class AppealTypeClassifier {
     CONSULTATION: wsnConfig.CONSULTATION_APPEAL_TYPE
   };
 
-  // Detection priority: most specific categories first, generic "leak" default last
+  // Detection priority resolves several facts in one call. A directly stated
+  // service-quality issue (for example, low pressure) is more useful to the
+  // dispatcher than a co-mentioned generic symptom such as a pipe burst.
+  // Generic leak detection deliberately stays near the end.
   private static readonly DETECTION_ORDER: AppealCategory[] = [
     'NO_WATER',
-    'CLOGGING',
     'SEWER_LEAK',
+    'CLOGGING',
     'DIRTY_WATER',
     'LOW_PRESSURE',
     'COLLAPSE',
-    'LEAK',
-    'OPEN_WELL',
     'DAMAGED_COVER',
+    'OPEN_WELL',
     'VALVE',
     'METER_INSTALL',
     'PIPE_REPLACEMENT',
     'PLANNED',
     'IMPROVEMENT',
     'PIPE_BURST',
+    'LEAK',
     'CONSULTATION'
   ];
+
+  /**
+   * Returns an appeal type only when the transcript contains an explicit
+   * domain signal. This is intentionally different from detectAppealType(),
+   * whose default is kept for the offline parser's historical behaviour.
+   */
+  tryDetectAppealType(lowerText: string): string | null {
+    const keywords = nlpConfig.APPEAL_TYPE_KEYWORDS;
+
+    for (const category of AppealTypeClassifier.DETECTION_ORDER) {
+      if (this.matchesCategory(category, lowerText, keywords)) {
+        return AppealTypeClassifier.CATEGORY_TO_VALUE[category];
+      }
+    }
+
+    return null;
+  }
+
+  private matchesCategory(
+    category: AppealCategory,
+    lowerText: string,
+    keywords: typeof nlpConfig.APPEAL_TYPE_KEYWORDS
+  ): boolean {
+    // Mentioning sewerage alone is not a sewer leak: it may be a blockage.
+    // A sewer-leak classification needs either a reference to wastewater/drains
+    // or an explicit leak symptom next to a reference to sewerage.
+    if (category === 'SEWER_LEAK') {
+      const hasSewerReference = keywords.SEWER_LEAK.some((word) => lowerText.includes(word));
+      const hasExplicitWastewater = lowerText.includes('стоки');
+      const hasLeakSymptom = keywords.LEAK.some((word) => lowerText.includes(word));
+      return hasSewerReference && (hasExplicitWastewater || hasLeakSymptom);
+    }
+
+    return keywords[category].some((word) => lowerText.includes(word));
+  }
 
   /**
    * Detect appeal type across all scenarios.
    */
   detectAppealType(lowerText: string): string {
-    const k = nlpConfig.APPEAL_TYPE_KEYWORDS;
+    return this.tryDetectAppealType(lowerText) ?? 'Витік води';
+  }
 
-    for (const category of AppealTypeClassifier.DETECTION_ORDER) {
-      if (k[category].some((word) => lowerText.includes(word))) {
-        return AppealTypeClassifier.CATEGORY_TO_VALUE[category];
-      }
+  /**
+   * Keeps the dependent ticket type deterministic when an explicit appeal
+   * signal overrides a less specific LLM classification.
+   */
+  getTicketTypeForAppealType(appealType: string): string | null {
+    if ([
+      'Провал',
+      'Відкритий колодязь',
+      'Пошкоджена кришка колодязя',
+      'Благоустрій'
+    ].includes(appealType)) {
+      return wsnConfig.OPTIONS.TICKET_TYPES[2];
     }
 
-    return 'Витік води';
+    if ([
+      'Планові роботи',
+      'Встановлення лічильника',
+      'Заміна трубопроводу',
+      wsnConfig.CONSULTATION_APPEAL_TYPE
+    ].includes(appealType)) {
+      return wsnConfig.OPTIONS.TICKET_TYPES[1];
+    }
+
+    if (Object.values(AppealTypeClassifier.CATEGORY_TO_VALUE).includes(appealType)) {
+      return wsnConfig.OPTIONS.TICKET_TYPES[0];
+    }
+
+    return null;
   }
 
   /**
@@ -70,6 +130,14 @@ export class AppealTypeClassifier {
    * "Аварійні роботи", "Планові роботи", "Благоустрій".
    */
   classifyTicketType(lowerText: string): string {
+    const detectedAppealType = this.tryDetectAppealType(lowerText);
+    const ticketTypeFromAppeal = detectedAppealType
+      ? this.getTicketTypeForAppealType(detectedAppealType)
+      : null;
+    if (ticketTypeFromAppeal) {
+      return ticketTypeFromAppeal;
+    }
+
     const { IMPROVEMENT, PLANNED } = nlpConfig.TICKET_TYPE_KEYWORDS;
 
     if (IMPROVEMENT.some((word) => lowerText.includes(word))) {

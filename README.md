@@ -11,8 +11,8 @@ tickets, and saves the result to Forland.
   parser.
 - A closed catalogue of appeal and ticket types, kept in sync with `wsnConfig`;
   Gemini may return only values accepted by the form.
-- AI fallback chain: `gemini-2.5-flash` → `gemini-2.5-flash-lite` →
-  `gemini-3.1-flash-lite` → local parser. If no transcript is available, the
+- AI fallback chain: `gemini-3.7-flash` → `gemini-3.6-flash` →
+  `gemini-3.5-flash-lite` → local parser. If no transcript is available, the
   final fallback is a demo scenario.
 - Address lookup through Geodata.online with Nominatim fallback. Coordinates
   come only from a geocoder response or deliberate operator input; city-centre
@@ -121,6 +121,59 @@ embedded in the browser bundle.
 The Forland proxy rewrites cookies for the same domain and removes the upstream
 `Content-Encoding` header so the browser does not receive
 `ERR_CONTENT_DECODING_FAILED` with an HTTP `200` response.
+
+## Releases and build identity
+
+`package.json.version` is the single semantic version source. Every Vite build
+embeds a read-only identity object containing:
+
+- semantic version;
+- short Git commit SHA;
+- deployment environment (`local`, `preview`, or `production`);
+- build timestamp;
+- Vercel deployment ID, when available.
+
+The compact `vX.Y.Z · revision` badge is visible on both the login page and the
+authenticated application header. Hover it to see the full metadata. This makes
+an operator screenshot or bug report traceable to one exact deployment.
+
+For Vercel builds, enable **Automatically expose System Environment Variables**
+in Project Settings → Environment Variables. The build reads
+`VERCEL_GIT_COMMIT_SHA`, `VERCEL_ENV`, and `VERCEL_DEPLOYMENT_ID`; local builds
+show `local` instead. See the [Vercel system environment variables
+documentation](https://vercel.com/docs/environment-variables/system-environment-variables).
+
+### Automated releases
+
+The [Release Please](.github/workflows/release-please.yml) workflow runs after
+every push to `main`. It maintains one Release PR based on Conventional Commit
+messages. When that PR is merged, it automatically:
+
+- bumps `package.json` and `package-lock.json` according to SemVer;
+- generates the matching `CHANGELOG.md` entry;
+- creates the Git tag (`vX.Y.Z`) and GitHub Release.
+
+Vercel creates a preview deployment for the Release PR and a production
+deployment after it is merged into `main`.
+
+Use these commit prefixes for releasable work:
+
+```text
+fix: correct coordinate lookup       # patch: 2.4.0 → 2.4.1
+feat: add ticket edit workflow      # minor: 2.4.0 → 2.5.0
+feat!: change ticket API contract   # major: 2.4.0 → 3.0.0
+```
+
+Use `fix:`, `feat:`, or a breaking-change marker for changes that should affect
+the published version; this keeps the version bump predictable for reviewers.
+
+The manifest starts at the existing `2.4.0` project version and the current
+Git revision, so historical commits are not treated as a new release.
+
+For the first run, GitHub repository administrators must allow workflow write
+permissions in **Settings → Actions → General → Workflow permissions**. If
+GitHub blocks creation of the Release PR, also enable **Allow GitHub Actions to
+create and approve pull requests** on that page.
 
 ## Verification commands
 

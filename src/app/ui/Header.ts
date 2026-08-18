@@ -1,7 +1,7 @@
 import { TicketStateStore } from '@/app/state/TicketStateStore';
 import { MOCK_SCENARIOS } from '@/features/tickets/testing/mock/mockData';
 import { escapeHtml } from '@/shared/utils/security';
-import { aiConfig, appConfig, wsnConfig } from '@/shared/config';
+import { aiConfig, appConfig, buildInfo, getBuildBadgeLabel, getBuildDetails, wsnConfig } from '@/shared/config';
 
 export class HeaderComponent {
   private store: TicketStateStore;
@@ -20,6 +20,12 @@ export class HeaderComponent {
     const unclosedTicketsCount = this.store.getUnclosedTickets().length;
     const isUnclosedTicketsPanelOpen = this.store.getIsUnclosedTicketsPanelOpen();
     const currentUser = this.store.getCurrentUser();
+    const buildBadgeClass = buildInfo.environment === 'production'
+      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+      : buildInfo.environment === 'preview'
+        ? 'bg-violet-500/15 text-violet-300 border-violet-500/30'
+        : 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+    const buildDetails = escapeHtml(getBuildDetails());
 
     this.container.innerHTML = `
       <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 px-3 sm:px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3 md:gap-4 sticky top-0 z-30 shadow-lg shadow-black/20">
@@ -33,7 +39,7 @@ export class HeaderComponent {
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <h1 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-wide leading-tight">${appConfig.TITLE}</h1>
-              <span class="bg-sky-500/20 text-sky-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-sky-500/30 shrink-0">${appConfig.VERSION_LABEL}</span>
+              <span title="${buildDetails}" class="${buildBadgeClass} text-[9px] sm:text-[10px] md:text-xs font-mono font-semibold px-1.5 md:px-2 py-0.5 rounded border shrink-0 cursor-help" aria-label="Build metadata: ${buildDetails}">${escapeHtml(getBuildBadgeLabel())}</span>
               ${aiConfig.MODE === 'local' ? '<span class="bg-amber-500/15 text-amber-300 text-[9px] sm:text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded border border-amber-500/30 shrink-0">Локальний AI</span>' : ''}
             </div>
             <p class="text-[9px] sm:text-[10px] md:text-xs text-slate-400 truncate max-w-[160px] sm:max-w-[200px] md:max-w-none">${appConfig.SUBTITLE}</p>

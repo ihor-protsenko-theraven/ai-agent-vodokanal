@@ -113,10 +113,15 @@ export class GeminiService {
           continue;
         }
 
-        console.warn(`[Gemini] Model ${modelName} returned status ${res.status}`);
-        // Invalid credentials (401/403) and invalid payloads (400) cannot be
-        // fixed by retrying a different model. Stop to avoid noisy duplicate
-        // requests; the caller will use the local parser as its safe fallback.
+        const errorInfo = await readGeminiErrorInfo(res);
+        console.warn(`[Gemini] Model ${modelName} returned status ${res.status}`, errorInfo);
+
+        // A model can be unavailable in one deployment while the next pinned
+        // model is still enabled. Retrying another candidate is safe in that
+        // specific case; malformed input and invalid credentials are not.
+        if (res.status === 400 && errorInfo.reason === 'model_not_allowed') {
+          continue;
+        }
         if ([400, 401, 403].includes(res.status)) {
           return null;
         }
@@ -225,10 +230,22 @@ export class GeminiService {
     if (spoken) {
       const lower = spoken.toLowerCase();
       const validAppealTypes: string[] = [...wsnConfig.OPTIONS.APPEAL_TYPES, wsnConfig.CONSULTATION_APPEAL_TYPE];
-      if (ticket.appealType && !validAppealTypes.includes(ticket.appealType)) {
+      const detectedAppealType = this.appealTypeClassifier.tryDetectAppealType(lower);
+
+      // The transcript is the source of truth for an explicitly recognised
+      // category. This also corrects a valid, but less specific, Gemini value:
+      // "прорив ... низький тиск" must be registered as low pressure.
+      if (detectedAppealType) {
+        ticket.appealType = detectedAppealType;
+        const detectedTicketType = this.appealTypeClassifier.getTicketTypeForAppealType(detectedAppealType);
+        if (detectedTicketType) {
+          ticket.ticketType = detectedTicketType;
+        }
+      } else if (ticket.appealType && !validAppealTypes.includes(ticket.appealType)) {
         ticket.appealType = this.appealTypeClassifier.detectAppealType(lower);
       }
-      if (ticket.ticketType && !(wsnConfig.OPTIONS.TICKET_TYPES as readonly string[]).includes(ticket.ticketType)) {
+
+      if (!detectedAppealType && ticket.ticketType && !(wsnConfig.OPTIONS.TICKET_TYPES as readonly string[]).includes(ticket.ticketType)) {
         ticket.ticketType = this.appealTypeClassifier.classifyTicketType(lower);
       }
 
@@ -314,5 +331,14 @@ export class GeminiService {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  }
+}
+
+async function readGeminiErrorInfo(response: Response): Promise<{ reason?: string }> {
+  try {
+    const value = await response.json() as { reason?: unknown };
+    return typeof value.reason === 'string' ? { reason: value.reason } : {};
+  } catch {
+    return {};
   }
 }

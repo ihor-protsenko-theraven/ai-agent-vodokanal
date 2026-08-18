@@ -18,14 +18,16 @@ const allowedTicketTypesForPrompt = wsnConfig.OPTIONS.TICKET_TYPES.map((value) =
 
 export const aiConfig = {
   MODE: resolveAiMode(import.meta.env.VITE_AI_MODE),
-  // Stable model with audio input and structured JSON output support.
-  GEMINI_MODEL: 'gemini-2.5-flash',
+  // Pinned models from the API key's ListModels response. The primary model is
+  // selected for higher-quality Ukrainian audio/text extraction; the final
+  // Flash-Lite model limits latency and quota impact during fallback.
+  GEMINI_MODEL: 'gemini-3.7-flash',
   GEMINI_TEMPERATURE: 0.1,
   // Ordered server-side fallback chain. All models accept audio input and
   // return structured JSON; the next one is tried only after a failed request.
   GEMINI_CANDIDATE_MODELS: [
-    'gemini-2.5-flash-lite',
-    'gemini-3.1-flash-lite'
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite'
   ] as const,
 
   CONFIDENCE_THRESHOLD: 0.7,
@@ -74,7 +76,7 @@ export const aiConfig = {
 - Стічні/фекальні води, каналізаційний витік, каналізація виливається на поверхню → "Витік на каналізації" → "Аварійні роботи".
 - Засмічилась каналізація/сток/труба БЕЗ витоку стоків на поверхню → "Закупорка" → "Аварійні роботи". Якщо є і засмічення, і витік стоків, пріоритет має "Витік на каналізації".
 - У будинку/на адресі немає води, воду повністю припинили, кран сухий → "Відсутність Води" → "Аварійні роботи". Повна відсутність води має пріоритет над слабким напором.
-- Вода є, але слабкий напір/низький тиск → "Низький тиск води" → "Аварійні роботи".
+- Вода є, але слабкий напір/низький тиск → "Низький тиск води" → "Аварійні роботи". Якщо одночасно згадано прорив/витік і явно сказано "низький тиск" або "слабкий напір", обирай саме "Низький тиск води": це основна потреба заявника.
 - Брудна, каламутна, іржава, жовта вода → "Брудна вода" → "Аварійні роботи".
 - Провалля, просідання ґрунту/асфальту, яма від обвалу → "Провал" → "Благоустрій".
 - Колодязь або люк відкритий, кришки немає і є отвір/небезпека падіння → "Відкритий колодязь" → "Благоустрій".
