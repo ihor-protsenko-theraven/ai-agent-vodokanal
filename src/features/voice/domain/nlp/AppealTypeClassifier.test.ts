@@ -16,7 +16,26 @@ describe('AppealTypeClassifier', () => {
   it('prioritises a sewer leak over a co-mentioned blockage', () => {
     expect(
       classifier.tryDetectAppealType('каналізація засмічилась, а стоки течуть на поверхню')
-    ).toBe('Витік на каналізації');
+    ).toBe('Витік каналізації');
+  });
+
+  it('does not classify sewerage alone as a sewer leak', () => {
+    expect(classifier.tryDetectAppealType('каналізація засмітилась біля будинку')).toBe('Закупорка');
+  });
+
+  it('prioritises an open hole over a damaged cover when both are mentioned', () => {
+    expect(
+      classifier.tryDetectAppealType('кришка люка зламана, люк відкритий і є небезпечний отвір')
+    ).toBe('Відкритий колодязь');
+  });
+
+  it('marks a bare manhole reference for manual review', () => {
+    const result = classifier.classify('біля люка стоїть вода');
+
+    expect(result).toMatchObject({
+      appealType: 'Відкритий колодязь',
+      requiresManualReview: true
+    });
   });
 
   it('does not invent an explicit category when the transcript has no domain signal', () => {

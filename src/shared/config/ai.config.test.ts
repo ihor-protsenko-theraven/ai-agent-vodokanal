@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { aiConfig, resolveAiMode } from './ai.config';
-import { wsnConfig } from './wsn.config';
 
 describe('AI runtime mode', () => {
   it('uses local mode only when explicitly configured', () => {
@@ -23,24 +22,22 @@ describe('AI runtime mode', () => {
     expect(aiConfig.PROMPTS.SYSTEM).toContain('Поверни ТІЛЬКИ один валідний JSON');
   });
 
-  it('keeps every actual WSN appeal and ticket type in the Gemini taxonomy', () => {
+  it('requires the live Forland catalogue provided with each Gemini request', () => {
     const prompt = aiConfig.PROMPTS.SYSTEM;
-    const appealTypes = [...wsnConfig.OPTIONS.APPEAL_TYPES, wsnConfig.CONSULTATION_APPEAL_TYPE];
 
-    for (const appealType of appealTypes) {
-      expect(prompt).toContain(`"${appealType}"`);
-    }
-    for (const ticketType of wsnConfig.OPTIONS.TICKET_TYPES) {
-      expect(prompt).toContain(`"${ticketType}"`);
-    }
+    expect(prompt).toContain('АКТУАЛЬНИЙ КАТАЛОГ WSN');
+    expect(prompt).toContain('catalog.appealTypes');
+    expect(prompt).toContain('catalog.ticketTypes');
   });
 
   it('documents the important ambiguity rules for Gemini', () => {
     const prompt = aiConfig.PROMPTS.SYSTEM;
 
-    expect(prompt).toContain('"Витік на каналізації" → "Аварійні роботи"');
+    expect(prompt).toContain('"Витік каналізації" → "Аварійні роботи"');
     expect(prompt).toContain('"Закупорка" → "Аварійні роботи"');
     expect(prompt).toContain('Повна відсутність води має пріоритет над слабким напором');
     expect(prompt).toContain('Активний прорив під час заміни — "Витік води" → "Аварійні роботи"');
+    expect(prompt).toContain('аудіо є джерелом істини');
+    expect(prompt).toContain('CALL_CAPTURED_AT_KYIV');
   });
 });

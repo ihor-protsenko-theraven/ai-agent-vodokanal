@@ -9,12 +9,20 @@ import { nlpConfig, wsnConfig } from '@/shared/config';
 
 type AppealCategory = keyof typeof nlpConfig.APPEAL_TYPE_KEYWORDS;
 
+export interface AppealClassification {
+  appealType: string | null;
+  ticketType: string | null;
+  evidence: string[];
+  confidence: number;
+  requiresManualReview: boolean;
+}
+
 export class AppealTypeClassifier {
   // Semantic category -> actual dropdown value from GetList (kindUnitID 27994)
   private static readonly CATEGORY_TO_VALUE: Record<AppealCategory, string> = {
     NO_WATER: 'Відсутність Води',
     CLOGGING: 'Закупорка',
-    SEWER_LEAK: 'Витік на каналізації',
+    SEWER_LEAK: 'Витік каналізації',
     DIRTY_WATER: 'Брудна вода',
     LOW_PRESSURE: 'Низький тиск води',
     PIPE_BURST: 'Витік води',
@@ -41,15 +49,15 @@ export class AppealTypeClassifier {
     'DIRTY_WATER',
     'LOW_PRESSURE',
     'COLLAPSE',
-    'DAMAGED_COVER',
     'OPEN_WELL',
+    'DAMAGED_COVER',
     'VALVE',
     'METER_INSTALL',
+    'PIPE_BURST',
+    'LEAK',
     'PIPE_REPLACEMENT',
     'PLANNED',
     'IMPROVEMENT',
-    'PIPE_BURST',
-    'LEAK',
     'CONSULTATION'
   ];
 
@@ -59,33 +67,92 @@ export class AppealTypeClassifier {
    * whose default is kept for the offline parser's historical behaviour.
    */
   tryDetectAppealType(lowerText: string): string | null {
+    return this.classify(lowerText).appealType;
+  }
+
+  /**
+   * Produces a decision together with the exact local evidence that led to it.
+   * This lets callers distinguish a direct report from a weak generic word
+   * such as "люк" and require operator review where appropriate.
+   */
+  classify(lowerText: string): AppealClassification {
     const keywords = nlpConfig.APPEAL_TYPE_KEYWORDS;
 
     for (const category of AppealTypeClassifier.DETECTION_ORDER) {
-      if (this.matchesCategory(category, lowerText, keywords)) {
-        return AppealTypeClassifier.CATEGORY_TO_VALUE[category];
+      const evidence = this.findEvidence(category, lowerText, keywords);
+      if (evidence.length > 0) {
+        const appealType = AppealTypeClassifier.CATEGORY_TO_VALUE[category];
+        const isWeakGenericSignal = category === 'OPEN_WELL' && evidence.length === 1 && evidence[0] === 'люк';
+        return {
+          appealType,
+          ticketType: this.getTicketTypeForAppealType(appealType),
+          evidence,
+          confidence: isWeakGenericSignal ? 0.58 : evidence.length > 1 ? 0.92 : 0.78,
+          requiresManualReview: isWeakGenericSignal
+        };
       }
     }
 
-    return null;
+    return {
+      appealType: null,
+      ticketType: null,
+      evidence: [],
+      confidence: 0.35,
+      requiresManualReview: true
+    };
   }
 
-  private matchesCategory(
+  private findEvidence(
     category: AppealCategory,
     lowerText: string,
     keywords: typeof nlpConfig.APPEAL_TYPE_KEYWORDS
-  ): boolean {
-    // Mentioning sewerage alone is not a sewer leak: it may be a blockage.
-    // A sewer-leak classification needs either a reference to wastewater/drains
-    // or an explicit leak symptom next to a reference to sewerage.
-    if (category === 'SEWER_LEAK') {
-      const hasSewerReference = keywords.SEWER_LEAK.some((word) => lowerText.includes(word));
-      const hasExplicitWastewater = lowerText.includes('стоки');
-      const hasLeakSymptom = keywords.LEAK.some((word) => lowerText.includes(word));
-      return hasSewerReference && (hasExplicitWastewater || hasLeakSymptom);
+  ): string[] {
+    const matchingKeywords = keywords[category].filter((word) => lowerText.includes(word));
+    const leakEvidence = keywords.LEAK.filter((word) => lowerText.includes(word));
+
+    if (category === 'NO_WATER') {
+      const directAbsence = matchingKeywords.filter((word) => word !== 'відключ' && word !== 'відключенн');
+      const disconnectionWithWater = matchingKeywords.filter(
+        (word) => (word === 'відключ' || word === 'відключенн') && /вод[а-яіїєґ]*/iu.test(lowerText)
+      );
+      return [...directAbsence, ...disconnectionWithWater];
     }
 
-    return keywords[category].some((word) => lowerText.includes(word));
+    if (category === 'SEWER_LEAK') {
+      const hasSewerReference = matchingKeywords.length > 0;
+      const hasSurfaceDischarge = /поверхн|вилива|залива|підтоп/iu.test(lowerText);
+      return hasSewerReference && (leakEvidence.length > 0 || hasSurfaceDischarge)
+        ? [...matchingKeywords, ...leakEvidence]
+        : [];
+    }
+
+    if (category === 'PIPE_BURST') {
+      const directBurstWords = matchingKeywords.filter((word) =>
+        ['порив', 'прорив', 'прорвало', 'гідроудар'].includes(word)
+      );
+      const hasPipelineLeak = matchingKeywords.some((word) => /водопровод/iu.test(word)) && leakEvidence.length > 0;
+      return directBurstWords.length > 0
+        ? directBurstWords
+        : hasPipelineLeak
+          ? [...matchingKeywords, ...leakEvidence]
+          : [];
+    }
+
+    if (category === 'OPEN_WELL') {
+      const hasCoverDamage = /кришк|зсунут|здвинут|тріщин|зламан/iu.test(lowerText);
+      const hasOpenHazard = /відкрит|немає\s+кришк|без\s+кришк|отвір|небезпек/iu.test(lowerText);
+      if (hasOpenHazard) return matchingKeywords;
+      // A bare reference to a manhole is insufficient but can remain a draft
+      // with an explicit manual-review requirement.
+      return hasCoverDamage ? [] : matchingKeywords.filter((word) => word === 'люк');
+    }
+
+    if (category === 'DAMAGED_COVER') {
+      const hasCoverContext = /кришк|зсунут|здвинут|тріщин|зламан/iu.test(lowerText);
+      return hasCoverContext ? matchingKeywords.filter((word) => word !== 'пошкоджен.*кришк') : [];
+    }
+
+    return matchingKeywords;
   }
 
   /**

@@ -1,4 +1,16 @@
+import { geoConfig } from '@/shared/config';
+
 const ADDRESS_PREFIX_PATTERN = /\b(?:вул(?:иця)?|ул(?:ица)?|просп(?:ект)?|пров(?:улок)?|пл(?:оща)?)\.?\s*/giu;
+const LOCALITY_TOKENS = new Set([
+  'м',
+  'місто',
+  'місті',
+  'село',
+  'селище',
+  'україна',
+  ...Object.keys(geoConfig.KNOWN_CITIES),
+  ...Object.values(geoConfig.KNOWN_CITIES).map((city) => city.toLocaleLowerCase('uk-UA'))
+]);
 
 function getAddressTokens(value: string): string[] {
   return value
@@ -8,6 +20,9 @@ function getAddressTokens(value: string): string[] {
     .trim()
     .split(/\s+/)
     .filter(Boolean)
+    // A city and country are locality context, not a street signal. Without
+    // this exclusion "Київ, ... 27" matched any other Kyiv address №27.
+    .filter((token) => !LOCALITY_TOKENS.has(token))
     .filter((token) => /\d/u.test(token) || token.length >= 4);
 }
 

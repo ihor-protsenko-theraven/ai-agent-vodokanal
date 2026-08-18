@@ -40,4 +40,21 @@ describe('DuplicateFinder', () => {
     expect(candidates.map((candidate) => candidate.ticketId)).toEqual(['11']);
     expect(candidates[0].matchReason).toBe('ADDRESS_MATCH');
   });
+
+  it('does not flag different Kyiv streets that happen to share a house number', () => {
+    const candidates = new DuplicateFinder().findPotentialDuplicates({
+      addressText: 'м. Київ, вул. Науки, 27',
+      coordinates: '50.396871, 30.531880',
+      searchText: 'м. Київ, вул. Науки, 27',
+      appealType: 'Витік води'
+    }, [{
+      id: 339306,
+      title: 'Заявка № 12261 [17.08.2026]',
+      addressText: 'м. Київ, вул. Перемоги, 27',
+      coordinates: '50.4504, 30.5235',
+      metaId: 27772
+    }]);
+
+    expect(candidates).toEqual([]);
+  });
 });

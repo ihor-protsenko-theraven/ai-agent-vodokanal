@@ -15,6 +15,7 @@ export class HeaderComponent {
   public render(): void {
     const result = this.store.getResult();
     const activeScenarioId = this.store.getActiveScenarioId();
+    const isDemoScenario = this.store.isDemoScenario();
     const isIntercepted = this.store.getCallIntercepted();
     const isPreparingNewTicket = this.store.getIsPreparingNewTicket();
     const unclosedTicketsCount = this.store.getUnclosedTickets().length;
@@ -56,8 +57,9 @@ export class HeaderComponent {
             ${unclosedTicketsCount > 0 ? `<span class="min-w-4 px-1 rounded bg-slate-950/70 text-sky-300 font-mono">${unclosedTicketsCount}</span>` : ''}
           </button>
           <div class="flex items-center gap-1.5 sm:gap-2">
-            <label for="scenario-select" class="text-[10px] md:text-xs text-slate-400 font-medium hidden sm:inline whitespace-nowrap">Сценарій ТЗ:</label>
+            <label for="scenario-select" class="text-[10px] md:text-xs ${isDemoScenario ? 'text-amber-300' : 'text-slate-400'} font-medium hidden sm:inline whitespace-nowrap">Демо-сценарій:</label>
             <select id="scenario-select" class="bg-slate-800 text-slate-200 text-[10px] sm:text-xs rounded-lg border border-slate-700 px-1.5 py-1 sm:px-2 sm:py-1.5 md:px-3 md:py-2 max-w-[90px] sm:max-w-[140px] md:max-w-xs focus:ring-2 focus:ring-sky-500 focus:outline-none cursor-pointer truncate">
+              <option value="" class="bg-slate-800 text-slate-400" ${!isDemoScenario ? 'selected' : ''}>Оберіть для демонстрації</option>
               ${MOCK_SCENARIOS.map(s => `
                 <option value="${escapeHtml(s.id)}" class="bg-slate-800 text-slate-200" ${s.id === activeScenarioId ? 'selected' : ''}>
                   ${escapeHtml(s.name)}
@@ -113,7 +115,9 @@ export class HeaderComponent {
     if (select) {
       select.addEventListener('change', (e) => {
         const val = (e.target as HTMLSelectElement).value;
-        this.store.loadScenario(val);
+        if (val) {
+          this.store.loadScenario(val);
+        }
       });
     }
 

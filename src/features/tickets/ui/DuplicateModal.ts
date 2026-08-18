@@ -79,8 +79,15 @@ export class DuplicateModalComponent {
 
           <!-- Actions -->
           <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-800 pt-4">
+            <p class="w-full text-[11px] text-slate-400">
+              Це рішення застосовується лише до цієї чернетки. Якщо змінити адресу аварії, перевірка дублікатів виконається повторно.
+            </p>
             <button id="btn-cancel-dup-modal" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-all">
               Продовжити редагування чернетки
+            </button>
+
+            <button id="btn-dismiss-duplicate" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-all">
+              Це не дублікат — продовжити
             </button>
 
             <button disabled title="Для цієї операції потрібен підтверджений Forland API read/update контракт" class="px-4 py-2 bg-slate-700 text-slate-400 font-bold rounded-xl text-xs cursor-not-allowed">
@@ -91,16 +98,20 @@ export class DuplicateModalComponent {
       </div>
     `;
 
-    this.attachEvents();
+    this.attachEvents(dup.ticketId);
   }
 
-  private attachEvents(): void {
+  private attachEvents(ticketId: string): void {
     const closeBtn = this.container.querySelector('#btn-close-dup-modal');
     const cancelBtn = this.container.querySelector('#btn-cancel-dup-modal');
+    const dismissBtn = this.container.querySelector<HTMLButtonElement>('#btn-dismiss-duplicate');
 
     const closeModal = () => this.store.setSelectedDuplicate(null);
 
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => this.store.dismissDuplicateCandidate(ticketId));
+    }
   }
 }

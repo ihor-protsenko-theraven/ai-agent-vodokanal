@@ -7,7 +7,7 @@ import {
   UserSession,
   WsnTicketData
 } from '@/shared/types';
-import { MOCK_SCENARIOS, SCENARIO_LOW_CONFIDENCE } from '@/features/tickets/testing/mock/mockData';
+import { MOCK_SCENARIOS } from '@/features/tickets/testing/mock/mockData';
 import { apiConfig, authConfig, aiConfig, wsnConfig, uiConfig } from '@/shared/config';
 import { forlandApiService } from '@/features/forland/infrastructure/ForlandApiService';
 import { dropdownDataService } from '@/features/forland/application/DropdownDataService';
@@ -37,13 +37,16 @@ export class TicketStateStore {
   private clarificationMode: ClarificationMode = 'TEXT_HINTS';
   private isCallIntercepted: boolean = false;
   private selectedDuplicate: TicketDuplicate | null = null;
+  // Candidate IDs explicitly rejected by the operator for the current draft.
+  // They are reset as soon as the incident address changes.
+  private dismissedDuplicateTicketIds: Set<string> = new Set();
   private isSubmitted: boolean = false;
   private submittedTicket: SavedUnit | null = null;
   private newTicketTemplate: CreateNewUnitResponse | null = null;
   private isPreparingNewTicket: boolean = false;
   private isCheckingDuplicates: boolean = false;
   private isProcessingAudio: boolean = false;
-  private activeScenarioId: string = aiConfig.SCENARIOS.LOW_CONFIDENCE;
+  private activeScenarioId: string = aiConfig.SCENARIOS.REAL_AUDIO;
   private unclosedTickets: UnclosedTicketSummary[] = [];
   private unclosedTicketsUpdatedAt: Date | null = null;
   private unclosedTicketsError: string | null = null;
@@ -57,7 +60,9 @@ export class TicketStateStore {
   private listeners: Set<StateChangeListener> = new Set();
 
   private constructor() {
-    this.result = { ...SCENARIO_LOW_CONFIDENCE };
+    // Mock scenarios are an explicit demo tool. A fresh production session
+    // must start with an empty draft rather than realistic-looking sample data.
+    this.result = createEmptyTicketResult();
     this.formData = toTicketFormData(this.result.ticket);
     this.verifications = getInitialVerifications(this.result);
     this.restoreSession();
@@ -108,6 +113,7 @@ export class TicketStateStore {
       this.forceRegistrationUnlocked = false;
       this.isCallIntercepted = false;
       this.selectedDuplicate = null;
+      this.dismissedDuplicateTicketIds.clear();
       this.isSubmitted = false;
       this.submittedTicket = null;
       this.newTicketTemplate = null;
@@ -137,6 +143,7 @@ export class TicketStateStore {
     this.forceRegistrationUnlocked = false;
     this.isCallIntercepted = false;
     this.selectedDuplicate = null;
+    this.dismissedDuplicateTicketIds.clear();
     this.isSubmitted = false;
     this.submittedTicket = null;
     this.newTicketTemplate = null;
@@ -290,6 +297,10 @@ export class TicketStateStore {
     return this.activeScenarioId;
   }
 
+  public isDemoScenario(): boolean {
+    return MOCK_SCENARIOS.some((scenario) => scenario.id === this.activeScenarioId);
+  }
+
   /**
    * Loads the data required by an authenticated operator. Keeping both
    * requests in one flow means a restored session is equivalent to a new
@@ -381,6 +392,7 @@ export class TicketStateStore {
       this.forceRegistrationUnlocked = false;
       this.isCallIntercepted = false;
       this.selectedDuplicate = null;
+      this.dismissedDuplicateTicketIds.clear();
       this.isSubmitted = false;
       this.submittedTicket = null;
       return true;
@@ -399,6 +411,7 @@ export class TicketStateStore {
     if (field === 'addressText') {
       this.result.duplicatesFound = [];
       this.result.duplicateCheckStatus = String(value).trim() ? 'REQUIRED' : undefined;
+      this.dismissedDuplicateTicketIds.clear();
     }
     if (notify) {
       this.notify();
@@ -411,6 +424,7 @@ export class TicketStateStore {
       this.formData.addressText = addressText.trim();
       this.result.duplicatesFound = [];
       this.result.duplicateCheckStatus = 'REQUIRED';
+      this.dismissedDuplicateTicketIds.clear();
     }
 
     this.formData.coordinates = coordinates;
@@ -444,7 +458,7 @@ export class TicketStateStore {
         coordinates: this.formData.coordinates,
         searchText: this.formData.addressText,
         appealType: this.formData.appealType || wsnConfig.OPTIONS.APPEAL_TYPES[0]
-      }, this.unclosedTickets);
+      }, this.unclosedTickets).filter((candidate) => !this.dismissedDuplicateTicketIds.has(candidate.ticketId));
       this.result.duplicateCheckStatus = 'COMPLETED';
       return true;
     } catch (error) {
@@ -484,6 +498,21 @@ export class TicketStateStore {
     this.notify();
   }
 
+  /**
+   * Records an operator decision for the current draft only. This never
+   * alters the existing WSN ticket; it only allows the operator to continue
+   * after reviewing a conservative false-positive candidate.
+   */
+  public dismissDuplicateCandidate(ticketId: string): void {
+    this.dismissedDuplicateTicketIds.add(ticketId);
+    this.result.duplicatesFound = this.result.duplicatesFound.filter(
+      (candidate) => candidate.ticketId !== ticketId
+    );
+    this.result.duplicateCheckStatus = 'COMPLETED';
+    this.selectedDuplicate = null;
+    this.notify();
+  }
+
   public appendSuggestedQuestion(questionText: string): void {
     if (this.formData.notes) {
       this.formData.notes += `\n${uiConfig.NOTES_CLARIFICATION_PREFIX}${questionText}`;
@@ -504,12 +533,36 @@ export class TicketStateStore {
   }
 
   public getValidationErrors(): string[] {
-    return getTicketValidationErrors({
+    const errors = getTicketValidationErrors({
       formData: this.formData,
       result: this.result,
       verifications: this.verifications,
       forceRegistrationUnlocked: this.forceRegistrationUnlocked
     });
+
+    if (this.isDemoScenario()) {
+      errors.unshift('Демо-сценарій не можна зберегти у WSN. Створіть нову або обробіть реальну заявку.');
+    }
+
+    // Never submit a label which is not present in the live Forland
+    // catalogue. The UI keeps such a draft value visible for investigation,
+    // but sending its text in place of an option ID would be unreliable.
+    if (
+      dropdownDataService.hasAppealTypes() &&
+      this.formData.appealType.trim() &&
+      dropdownDataService.getAppealTypeId(this.formData.appealType) == null
+    ) {
+      errors.push('Тип звернення відсутній у завантаженому каталозі Forland. Оновіть сторінку або виберіть значення вручну.');
+    }
+    if (
+      dropdownDataService.hasTicketTypes() &&
+      this.formData.ticketType.trim() &&
+      dropdownDataService.getTicketTypeId(this.formData.ticketType) == null
+    ) {
+      errors.push('Тип заявки відсутній у завантаженому каталозі Forland. Оновіть сторінку або виберіть значення вручну.');
+    }
+
+    return errors;
   }
 
   public async submitTicket(): Promise<boolean> {

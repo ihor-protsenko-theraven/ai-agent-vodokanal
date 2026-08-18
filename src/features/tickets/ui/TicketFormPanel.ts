@@ -6,6 +6,7 @@ import { aiConfig, geoConfig, wsnConfig, uiConfig } from '@/shared/config';
 import { dropdownDataService } from '@/features/forland/application/DropdownDataService';
 import { geocodingService, AddressSearchResult, GeocodingProvider } from '@/features/geocoding/application/GeocodingService';
 import { formatDateTimeInput } from '@/shared/utils/wsn';
+import { withSelectedOption } from '@/features/tickets/domain/selectOptions';
 
 export class TicketFormPanelComponent {
   private store: TicketStateStore;
@@ -33,8 +34,14 @@ export class TicketFormPanelComponent {
     // Get dropdown options from service
     const appealTypes = dropdownDataService.getAppealTypes();
     const ticketTypes = dropdownDataService.getTicketTypes();
-    const appealTypeOptions = appealTypes.length > 0 ? appealTypes.map(item => item.Value) : [...wsnConfig.OPTIONS.APPEAL_TYPES];
-    const ticketTypeOptions = ticketTypes.length > 0 ? ticketTypes.map(item => item.Value) : [...wsnConfig.OPTIONS.TICKET_TYPES];
+    const appealTypeOptions = withSelectedOption(
+      appealTypes.length > 0 ? appealTypes.map(item => item.Value) : wsnConfig.OPTIONS.APPEAL_TYPES,
+      formData.appealType
+    );
+    const ticketTypeOptions = withSelectedOption(
+      ticketTypes.length > 0 ? ticketTypes.map(item => item.Value) : wsnConfig.OPTIONS.TICKET_TYPES,
+      formData.ticketType
+    );
 
     const activeGeoProvider = geocodingService.getProvider();
 
@@ -120,7 +127,7 @@ export class TicketFormPanelComponent {
                   <p class="text-xs text-amber-200/80 mt-0.5">
                     Виявлено <strong>${duplicates.length}</strong> збігів адреси або координат з активними заявками класу ${wsnConfig.CLASS_ID}:
                     <span class="font-mono underline font-semibold ml-1">${duplicates.map(d => escapeHtml(d.ticketId)).join(', ')}</span>
-                    Створення призупинено до ручної перевірки в WSN.
+                    Перегляньте кандидата: оператор може відхилити хибний збіг і продовжити створення чернетки.
                   </p>
                 </div>
               </div>

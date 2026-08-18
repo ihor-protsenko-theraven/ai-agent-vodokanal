@@ -129,7 +129,7 @@ export function getTicketValidationErrors(input: TicketValidationInput): string[
   }
 
   if (result.requiresTicketRegistration && result.duplicatesFound.length > 0) {
-    errors.push('Знайдено можливі дублікати за адресою або координатами WSN. Створення призупинено до ручної перевірки.');
+    errors.push('Знайдено можливі дублікати за адресою або координатами WSN. Перегляньте кандидата та за потреби відхиліть його вручну.');
   }
 
   return errors;
