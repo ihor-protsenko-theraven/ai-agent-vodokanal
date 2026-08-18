@@ -3,6 +3,13 @@
 All notable changes to this project are recorded in this file. The project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [2.5.0](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.4.0...v2.5.0) (2026-08-18)
+
+
+### Features
+
+* improve ticket parsing ([c013d77](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/c013d776f9e1c50cb59076debbab3778a351ac7b))
+
 ## [Unreleased]
 
 ## [2.4.0] - 2026-08-18
