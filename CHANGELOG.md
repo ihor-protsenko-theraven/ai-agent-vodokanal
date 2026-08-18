@@ -3,6 +3,19 @@
 All notable changes to this project are recorded in this file. The project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [2.7.0](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.6.0...v2.7.0) (2026-08-18)
+
+
+### Features
+
+* add reviewer ([847af26](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/847af26420c071d9662f2e4a7bdb421630a9bbbf))
+* add reviewer ([be47945](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/be47945ded213d342da23d0a2b030da5d286ac99))
+
+
+### Bug Fixes
+
+* synchronize npm lockfile ([51a9857](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/51a98578b15c0b6176481e2e10cc605e6eaeda02))
+
 ## [2.6.0](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.5.0...v2.6.0) (2026-08-18)
 
 
