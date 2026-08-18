@@ -14,6 +14,13 @@ describe('isLikelyAddressMatch', () => {
     expect(isLikelyAddressMatch('просп. Берестейський, 88', 'Заявка № 1045: витік води')).toBe(false);
   });
 
+  it('does not treat a shared city and house number as an address match', () => {
+    expect(isLikelyAddressMatch(
+      'м. Київ, вул. Науки, 27',
+      'м. Київ, вул. Перемоги, 27'
+    )).toBe(false);
+  });
+
   it('requires two meaningful words when the report has no house number', () => {
     expect(isLikelyAddressMatch('проспект Героїв Небесної Сотні', 'просп. Героїв Небесної Сотні')).toBe(true);
     expect(isLikelyAddressMatch('Хрещатик', 'Аварія на Хрещатику')).toBe(false);

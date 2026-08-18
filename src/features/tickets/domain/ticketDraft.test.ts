@@ -68,6 +68,6 @@ describe('ticket draft rules', () => {
       result,
       verifications: getInitialVerifications(result),
       forceRegistrationUnlocked: false
-    })).toContain('Знайдено можливі дублікати за адресою або координатами WSN. Створення призупинено до ручної перевірки.');
+    })).toContain('Знайдено можливі дублікати за адресою або координатами WSN. Перегляньте кандидата та за потреби відхиліть його вручну.');
   });
 });

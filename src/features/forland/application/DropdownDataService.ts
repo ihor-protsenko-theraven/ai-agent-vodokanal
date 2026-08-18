@@ -189,6 +189,14 @@ class DropdownDataService {
     return this.data.appealTypes.length > 0 || this.data.ticketTypes.length > 0;
   }
 
+  hasAppealTypes(): boolean {
+    return this.data.appealTypes.length > 0;
+  }
+
+  hasTicketTypes(): boolean {
+    return this.data.ticketTypes.length > 0;
+  }
+
   /**
    * Get error message
    */

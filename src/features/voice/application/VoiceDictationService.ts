@@ -87,17 +87,19 @@ export class VoiceDictationService {
     const lower = text.toLowerCase();
 
     // 1. Detect Appeal Type and Ticket Type
-    const appealType = this.appealTypeClassifier.detectAppealType(lower);
+    const classification = this.appealTypeClassifier.classify(lower);
+    const appealType = classification.appealType ?? this.appealTypeClassifier.detectAppealType(lower);
     const isConsultation = this.appealTypeClassifier.isConsultation(appealType);
     const ticketType = isConsultation
       ? wsnConfig.OPTIONS.TICKET_TYPES[1]
-      : this.appealTypeClassifier.classifyTicketType(lower);
+      : classification.ticketType ?? this.appealTypeClassifier.classifyTicketType(lower);
     const requiresTicketRegistration = !isConsultation;
 
     // 2. Extract phone, name and address
     const phoneNumber = this.phoneExtractor.extract(text);
     const applicantName = this.nameExtractor.extract(text);
     const extractedAddress = this.addressParser.parse(text);
+    const extractedApplicantAddress = this.addressParser.parseApplicantAddress(text);
     let addressText = extractedAddress.fullAddress;
     const detectedCity = extractedAddress.city;
 
@@ -131,11 +133,13 @@ export class VoiceDictationService {
       ? aiConfig.CONFIDENCE_SCORES.SPEECH_DEFAULT
       : aiConfig.CONFIDENCE_SCORES.SPEECH_SHORT;
 
-    const classificationConfidence = aiConfig.CONFIDENCE_SCORES.CLASSIFICATION_DEFAULT;
+    const classificationConfidence = classification.confidence;
 
     // Trigger manual review flag if address or geocoding confidence < threshold
     const requiresManualReview =
-      addressConfidence < aiConfig.CONFIDENCE_THRESHOLD || geoConfidence < aiConfig.CONFIDENCE_THRESHOLD;
+      addressConfidence < aiConfig.CONFIDENCE_THRESHOLD ||
+      geoConfidence < aiConfig.CONFIDENCE_THRESHOLD ||
+      classification.requiresManualReview;
 
     // Duplicate detection happens centrally in TicketStateStore against the
     // authenticated Forland session. Never fabricate a local ticket here.
@@ -152,7 +156,10 @@ export class VoiceDictationService {
         appealType,
         ticketType,
         applicantName,
-        applicantAddress: isConsultation ? nlpConfig.CONSULTATION_ADDRESS_LABEL : addressText,
+        // A residence stated after an explicit cue has priority. When it is
+        // absent, WSN operators requested the incident address as a practical
+        // fallback instead of an empty applicant-address field.
+        applicantAddress: extractedApplicantAddress?.fullAddress ?? addressText,
         addressText: isConsultation ? nlpConfig.CONSULTATION_ADDRESS_LABEL : addressText,
         coordinates: isConsultation ? '' : coordinates,
         phoneNumber,

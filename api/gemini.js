@@ -16,6 +16,84 @@ const ALLOWED_MODELS = new Set([
 ]);
 const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 
+const DEFAULT_TICKET_CATALOG = {
+  appealTypes: ['Витік води', 'Провал', 'Низький тиск води', 'Відсутність Води', 'Брудна вода', 'Закупорка', 'Витік каналізації', 'Відкритий колодязь', 'Пошкоджена кришка колодязя', 'Несправність засувки', 'Планові роботи', 'Встановлення лічильника', 'Благоустрій', 'Заміна трубопроводу', 'Консультація / Тарифи'],
+  ticketTypes: ['Аварійні роботи', 'Планові роботи', 'Благоустрій']
+};
+
+// Keep this schema compact: Gemini supports a JSON Schema subset, and the
+// client still validates every value at runtime before it reaches the form.
+function createTicketDraftSchema(catalog) {
+  return {
+  type: 'object',
+  properties: {
+    ticket: {
+      type: 'object',
+      properties: {
+        appealType: { type: 'string', enum: catalog.appealTypes },
+        ticketType: { type: 'string', enum: catalog.ticketTypes },
+        applicantName: { type: 'string' },
+        applicantAddress: { type: 'string' },
+        addressText: { type: 'string' },
+        coordinates: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        incidentDateTime: { type: 'string' },
+        notes: { type: 'string' }
+      },
+      required: ['appealType', 'ticketType', 'applicantName', 'applicantAddress', 'addressText', 'coordinates', 'phoneNumber', 'incidentDateTime', 'notes'],
+      additionalProperties: false
+    },
+    confidence: {
+      type: 'object',
+      properties: {
+        speechRecognition: { type: 'number', minimum: 0, maximum: 1 },
+        classification: { type: 'number', minimum: 0, maximum: 1 },
+        addressExtraction: { type: 'number', minimum: 0, maximum: 1 },
+        geocoding: { type: 'number', minimum: 0, maximum: 1 }
+      },
+      required: ['speechRecognition', 'classification', 'addressExtraction', 'geocoding'],
+      additionalProperties: false
+    },
+    requiresManualReview: { type: 'boolean' },
+    requiresTicketRegistration: { type: 'boolean' },
+    suggestedQuestions: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+    duplicatesFound: { type: 'array', maxItems: 0 }
+  },
+  required: ['ticket', 'confidence', 'requiresManualReview', 'requiresTicketRegistration', 'suggestedQuestions', 'duplicatesFound'],
+  additionalProperties: false,
+  propertyOrdering: ['ticket', 'confidence', 'requiresManualReview', 'requiresTicketRegistration', 'suggestedQuestions', 'duplicatesFound']
+  };
+}
+
+function normalizeCatalogValues(values) {
+  if (!Array.isArray(values)) return null;
+
+  const uniqueValues = [];
+  for (const value of values) {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim();
+    if (!normalized || normalized.length > 160) return null;
+    if (!uniqueValues.includes(normalized)) uniqueValues.push(normalized);
+    if (uniqueValues.length > 100) return null;
+  }
+
+  return uniqueValues;
+}
+
+function getTicketCatalog(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return DEFAULT_TICKET_CATALOG;
+  }
+
+  const appealTypes = normalizeCatalogValues(value.appealTypes);
+  const ticketTypes = normalizeCatalogValues(value.ticketTypes);
+  if (!appealTypes || appealTypes.length === 0 || !ticketTypes || ticketTypes.length === 0) {
+    return DEFAULT_TICKET_CATALOG;
+  }
+
+  return { appealTypes, ticketTypes };
+}
+
 function sendJson(res, status, body) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -97,7 +175,7 @@ export default async function handler(req, res) {
     });
   }
 
-  const { model, parts } = request;
+  const { model, parts, catalog: requestedCatalog } = request;
   const invalidRequestReason = getInvalidRequestReason(model, parts);
   if (invalidRequestReason) {
     return sendJson(res, 400, {
@@ -107,6 +185,8 @@ export default async function handler(req, res) {
       ...(invalidRequestReason === 'model_not_allowed' ? { allowedModels: [...ALLOWED_MODELS] } : {})
     });
   }
+
+  const catalog = getTicketCatalog(requestedCatalog);
 
   try {
     const upstream = await fetch(
@@ -121,6 +201,7 @@ export default async function handler(req, res) {
           contents: [{ parts }],
           generationConfig: {
             responseMimeType: 'application/json',
+            responseJsonSchema: createTicketDraftSchema(catalog),
             temperature: 0.1
           }
         })
