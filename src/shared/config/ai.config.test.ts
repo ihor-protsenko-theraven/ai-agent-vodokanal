@@ -9,9 +9,12 @@ describe('AI runtime mode', () => {
     expect(resolveAiMode(undefined)).toBe('gemini');
   });
 
-  it('uses the supported Gemini 2.5 Flash model only', () => {
+  it('uses Gemini Flash with two compatible Flash-Lite fallbacks', () => {
     expect(aiConfig.GEMINI_MODEL).toBe('gemini-2.5-flash');
-    expect(aiConfig.GEMINI_CANDIDATE_MODELS).toEqual(['gemini-2.5-flash']);
+    expect(aiConfig.GEMINI_CANDIDATE_MODELS).toEqual([
+      'gemini-2.5-flash-lite',
+      'gemini-3.1-flash-lite'
+    ]);
   });
 
   it('defines a strict WSN ticket-draft contract for Gemini', () => {

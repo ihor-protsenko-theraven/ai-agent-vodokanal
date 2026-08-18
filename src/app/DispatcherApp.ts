@@ -40,11 +40,10 @@ export class TicketDispatcherUI {
       this.renderAll();
     });
 
-    // After a page refresh the session is restored from storage but dropdown
-    // data may be stale/empty: refresh from API in the background and re-render
-    // when the data changes (cached values are already available immediately).
+    // A restored session needs the same authenticated operator data as a fresh
+    // login: dropdown options and the unclosed-ticket list.
     if (this.store.isAuthenticated()) {
-      void dropdownDataService.loadDropdownData();
+      void this.store.loadOperatorData();
     }
     dropdownDataService.subscribe(() => {
       this.renderAll();

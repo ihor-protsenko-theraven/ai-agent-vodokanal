@@ -169,10 +169,7 @@ export class TicketStateStore {
         // Ignore session storage errors
       }
 
-      // Load dropdown data after successful login
-      await dropdownDataService.loadDropdownData();
-
-      this.notify();
+      await this.loadOperatorData();
       return true;
     }
     return false;
@@ -293,6 +290,19 @@ export class TicketStateStore {
     return this.activeScenarioId;
   }
 
+  /**
+   * Loads the data required by an authenticated operator. Keeping both
+   * requests in one flow means a restored session is equivalent to a new
+   * login: dropdown values and unclosed tickets are refreshed together.
+   */
+  public async loadOperatorData(): Promise<void> {
+    await Promise.all([
+      dropdownDataService.loadDropdownData(),
+      this.refreshUnclosedTickets(false)
+    ]);
+    this.notify();
+  }
+
   public async toggleUnclosedTicketsPanel(): Promise<void> {
     this.isUnclosedTicketsPanelOpen = !this.isUnclosedTicketsPanelOpen;
     this.notify();
@@ -329,8 +339,8 @@ export class TicketStateStore {
       } catch (error) {
         console.error('Unable to load unclosed tickets from Forland:', error);
         const startCommand = apiConfig.FORLAND.PROXY_BASE_PATH === '/api/forland'
-          ? 'npx vercel dev'
-          : 'npm run dev';
+          ? 'npm run dev:vercel'
+          : 'npm run dev:local';
         this.unclosedTicketsError = `Не вдалося з’єднатися з проксі Forland (${apiConfig.FORLAND.PROXY_BASE_PATH}). Перевірте, що запущено ${startCommand}, і оновіть сторінку.`;
         return false;
       } finally {

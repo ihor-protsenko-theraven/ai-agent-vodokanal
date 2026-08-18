@@ -1,6 +1,11 @@
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const ALLOWED_MODELS = new Set([
-  'gemini-2.5-flash'
+  // Keep in sync with aiConfig.GEMINI_MODEL and GEMINI_CANDIDATE_MODELS.
+  // Flash-Lite models are used only when the previous model is unavailable
+  // or its quota is exhausted.
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-3.1-flash-lite'
 ]);
 const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 

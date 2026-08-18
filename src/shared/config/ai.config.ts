@@ -21,8 +21,11 @@ export const aiConfig = {
   // Stable model with audio input and structured JSON output support.
   GEMINI_MODEL: 'gemini-2.5-flash',
   GEMINI_TEMPERATURE: 0.1,
+  // Ordered server-side fallback chain. All models accept audio input and
+  // return structured JSON; the next one is tried only after a failed request.
   GEMINI_CANDIDATE_MODELS: [
-    'gemini-2.5-flash'
+    'gemini-2.5-flash-lite',
+    'gemini-3.1-flash-lite'
   ] as const,
 
   CONFIDENCE_THRESHOLD: 0.7,
