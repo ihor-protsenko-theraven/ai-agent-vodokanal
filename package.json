@@ -6,6 +6,8 @@
   "scripts": {
     "dev:local": "vite",
     "dev:vercel": "npx vercel dev",
+    "lint": "eslint .",
+    "lint:ci": "eslint . --max-warnings 115",
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "test": "vitest run",
@@ -13,11 +15,16 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.2.0",
     "autoprefixer": "^10.4.19",
+    "eslint": "^10.8.1",
+    "eslint-plugin-sonarjs": "^4.2.0",
+    "globals": "^17.11.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.5",
+    "typescript-eslint": "^8.67.0",
     "vite": "8.0.5",
     "vitest": "^4.1.10"
   }

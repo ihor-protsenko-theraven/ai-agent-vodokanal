@@ -34,6 +34,6 @@ export function getSavedUnit(response: SaveResponse | null): SavedUnit | null {
 
 /** Extract the human-facing number from a standard Forland ticket title. */
 export function getTicketNumber(title: string | undefined): string | null {
-  const match = title?.match(/заявка\s*№\s*([^\s\[]+)/iu);
+  const match = title?.match(/заявка\s*№\s*([^\s[]+)/iu);
   return match?.[1] ?? null;
 }

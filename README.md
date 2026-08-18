@@ -178,13 +178,15 @@ create and approve pull requests** on that page.
 ## Verification commands
 
 ```powershell
+npm run lint
 npm run typecheck
 npm test
 npm run build
 ```
 
-`npm run build` already runs `typecheck`. All three commands should pass before
-handing over a change.
+`npm run build` already runs `typecheck`. The pull-request workflow runs lint,
+tests, and build on Node.js 22. `lint:ci` also preserves the current warning
+baseline, so a change cannot introduce additional code-smell warnings.
 
 ## Troubleshooting
 

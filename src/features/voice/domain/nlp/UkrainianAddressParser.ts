@@ -8,7 +8,7 @@ import { ParsedAddress } from '@/shared/types/nlp';
 import { capitalizeFirst } from '@/shared/utils/text';
 
 const UKRAINIAN_WORD = `[а-яіїєґ][а-яіїєґ'’-]*`;
-const STREET_TYPE = '(?:вул(?:\.|иц(?:я|і|ю|е))?|просп(?:\.|ект)?|пров(?:\.|улок)?|бульв(?:ар|\.)?|бул\.|майдан|наб(?:ережна|\.)?|площ(?:а|\.)?)';
+const STREET_TYPE = '(?:вул(?:[.]|иц(?:я|і|ю|е))?|просп(?:[.]|ект)?|пров(?:[.]|улок)?|бульв(?:ар|[.])?|бул[.]|майдан|наб(?:ережна|[.])?|площ(?:а|[.])?)';
 const HOUSE_NUMBER = '\\d+(?:[-а-яіїєґa-z]+)?(?:\\/\\d+)?';
 const STREET_NAME = `${UKRAINIAN_WORD}(?:\\s+${UKRAINIAN_WORD}){0,3}`;
 

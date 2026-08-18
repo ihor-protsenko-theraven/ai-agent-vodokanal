@@ -382,7 +382,11 @@ export class TranscriptPanelComponent {
       }
 
       if (target.closest('#btn-record-mic')) {
-        this.isRecording ? this.stopMicrophoneRecording() : this.startMicrophoneRecording();
+        if (this.isRecording) {
+          this.stopMicrophoneRecording();
+        } else {
+          this.startMicrophoneRecording();
+        }
         return;
       }
 
