@@ -16,6 +16,10 @@ import { GeodataAddress, GeodataCity, GeodataHouse, GeodataStreet } from '@/shar
 export interface GeodataAddressResolution {
   address: GeodataAddress;
   coordinates: string | null;
+  originalAddress: string;
+  resolvedAddress: string;
+  requiresOperatorConfirmation: boolean;
+  confirmationReasons: string[];
 }
 
 class GeodataService {
@@ -124,7 +128,10 @@ class GeodataService {
   async getFullAddress(request: string, lang?: string): Promise<GeodataAddress | null> {
     if (!request || !request.trim()) return null;
     const query = this.buildQuery({
-      sRequest: this.normalizeRequest(request),
+      // FullAddress is the authoritative fuzzy processor. It must receive the
+      // address exactly as the caller extracted it from the conversation; local
+      // aliases or punctuation cleanup can turn one spoken street into another.
+      sRequest: request.trim(),
       sLang: lang || this.defaultLang
     });
     const data = await this.get<GeodataAddress[]>(`${geoConfig.GEODATA_FULL_ADDRESS_PATH}?${query}`);
@@ -303,21 +310,135 @@ class GeodataService {
       });
     }
 
+    const confirmationReasons = this.getConfirmationReasons(addressStr, full);
+    const requiresOperatorConfirmation = confirmationReasons.length > 0;
+    const resolvedAddress = this.getDisplayAddress(full) || addressStr.trim();
+
     const coords = this.getCoordinatesString(full);
     if (coords) {
-      return { address: full, coordinates: coords };
+      return {
+        address: full,
+        coordinates: coords,
+        originalAddress: addressStr.trim(),
+        resolvedAddress,
+        requiresOperatorConfirmation,
+        confirmationReasons
+      };
     }
 
     const houseCoords = await this.getHouseCoordinates(full);
     if (!houseCoords) {
       console.warn('[Geodata] FullAddress and the house lookup returned no usable coordinates.');
     }
-    return { address: full, coordinates: houseCoords };
+    return {
+      address: full,
+      coordinates: houseCoords,
+      originalAddress: addressStr.trim(),
+      resolvedAddress,
+      requiresOperatorConfirmation,
+      confirmationReasons
+    };
   }
 
   async getCoordinates(addressStr: string): Promise<string | null> {
     const result = await this.resolveAddress(addressStr);
-    return result?.coordinates ?? null;
+    // Do not silently geocode a different street/house returned by
+    // FullAddress. The UI exposes this candidate to an operator instead.
+    return result && !result.requiresOperatorConfirmation ? result.coordinates : null;
+  }
+
+  /** Produces a human-readable canonical address from a FullAddress record. */
+  private getDisplayAddress(address: GeodataAddress): string {
+    if (address.AddressString?.trim()) return address.AddressString.trim();
+
+    const city = [address.SettlementType, address.City].filter(Boolean).join(' ').trim();
+    const street = [address.StrType, address.Street].filter(Boolean).join(' ').trim();
+    const house = [address.HouseNum, address.HouseNumAdd].filter(Boolean).join('').trim();
+    return [city, street, house].filter(Boolean).join(', ');
+  }
+
+  /**
+   * FullAddress returns one processed address even when it had to guess. A
+   * returned diagnostic, another house number, or a materially different
+   * street name are all explicit operator-review cases.
+   */
+  private getConfirmationReasons(originalAddress: string, resolved: GeodataAddress): string[] {
+    const reasons: string[] = [];
+
+    if (resolved.Comments?.trim()) {
+      reasons.push(`Geodata: ${resolved.Comments.trim()}`);
+    }
+
+    const spokenHouse = this.extractHouseNumber(originalAddress);
+    const resolvedHouse = [resolved.HouseNum, resolved.HouseNumAdd].filter(Boolean).join('');
+    if (spokenHouse && resolvedHouse && this.normalizeComparable(spokenHouse) !== this.normalizeComparable(resolvedHouse)) {
+      reasons.push(`номер будинку: «${spokenHouse}» → «${resolvedHouse}»`);
+    }
+
+    const spokenStreet = this.extractStreetName(originalAddress);
+    if (spokenStreet && resolved.Street?.trim() && !this.isSimilarStreet(spokenStreet, resolved.Street)) {
+      reasons.push(`вулиця: «${spokenStreet}» → «${resolved.Street.trim()}»`);
+    }
+
+    return reasons;
+  }
+
+  private extractHouseNumber(value: string): string | null {
+    const matches = value.match(/\d+(?:[\p{L}a-z]+)?(?:\/\d+)?/giu);
+    return matches?.at(-1)?.trim() || null;
+  }
+
+  private extractStreetName(value: string): string | null {
+    const words = value.match(/[\p{L}'’-]+/gu) ?? [];
+    const typeIndex = words.findIndex((word) => {
+      const normalized = word.toLocaleLowerCase('uk-UA');
+      return geoConfig.STREET_TYPE_KEYWORDS.some((keyword) => normalized.startsWith(keyword));
+    });
+    if (typeIndex === -1) return null;
+
+    const followingWords = words.slice(typeIndex + 1);
+    const stopIndex = followingWords.findIndex((word, index) => {
+      const normalized = word.toLocaleLowerCase('uk-UA');
+      const next = followingWords[index + 1]?.toLocaleLowerCase('uk-UA');
+      return normalized === 'на'
+        || normalized === 'будинок'
+        || normalized === 'буд'
+        || normalized === 'номер'
+        || normalized === 'в' && (next === 'місті' || next === 'м')
+        || normalized === 'у' && next === 'місті';
+    });
+
+    const streetWords = followingWords.slice(0, stopIndex === -1 ? 3 : stopIndex);
+    return streetWords.join(' ').trim() || null;
+  }
+
+  private isSimilarStreet(first: string, second: string): boolean {
+    const left = this.normalizeComparable(first);
+    const right = this.normalizeComparable(second);
+    if (!left || !right || left === right || left.includes(right) || right.includes(left)) return true;
+
+    const distance = this.levenshteinDistance(left, right);
+    return distance / Math.max(left.length, right.length) <= 0.2;
+  }
+
+  private levenshteinDistance(left: string, right: string): number {
+    const previous = Array.from({ length: right.length + 1 }, (_value, index) => index);
+
+    for (let row = 1; row <= left.length; row += 1) {
+      let diagonal = previous[0];
+      previous[0] = row;
+      for (let column = 1; column <= right.length; column += 1) {
+        const above = previous[column];
+        previous[column] = Math.min(
+          previous[column] + 1,
+          previous[column - 1] + 1,
+          diagonal + (left[row - 1] === right[column - 1] ? 0 : 1)
+        );
+        diagonal = above;
+      }
+    }
+
+    return previous[right.length];
   }
 
   private async getHouseCoordinates(address: GeodataAddress): Promise<string | null> {

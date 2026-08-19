@@ -297,6 +297,7 @@ export class TicketFormPanelComponent {
                 </button>
               </div>
               <div id="geo-search-status" class="hidden text-[10px] text-slate-400"></div>
+              <div id="geo-address-confirmation" class="hidden"></div>
               <div id="geo-search-results" class="hidden max-h-44 overflow-y-auto space-y-1"></div>
             </div>
 
@@ -376,6 +377,7 @@ export class TicketFormPanelComponent {
     `;
 
     this.attachEvents();
+    this.renderPendingAddressConfirmation();
     this.scheduleAutoGeocode();
   }
 
@@ -622,6 +624,15 @@ export class TicketFormPanelComponent {
       });
     }
 
+    const confirmationEl = this.container.querySelector('#geo-address-confirmation');
+    if (confirmationEl) {
+      confirmationEl.addEventListener('click', (event) => {
+        const action = (event.target as HTMLElement).closest<HTMLElement>('[data-address-confirmation]')
+          ?.dataset.addressConfirmation;
+        if (action) void this.handleAddressConfirmationAction(action);
+      });
+    }
+
     // Reverse geocoding by coordinates
     const btnReverse = this.container.querySelector('#btn-reverse-geocode');
     if (btnReverse) {
@@ -630,6 +641,7 @@ export class TicketFormPanelComponent {
   }
 
   private lastGeoSearchResults: AddressSearchResult[] = [];
+  private pendingAddressConfirmation: AddressSearchResult | null = null;
   private geoSearchTimer: number | null = null;
   private autoGeoTimer: number | null = null;
   private autoGeoAttempted: string | null = null;
@@ -649,6 +661,75 @@ export class TicketFormPanelComponent {
       resultsEl.classList.add('hidden');
       resultsEl.innerHTML = '';
     }
+    this.clearAddressConfirmation();
+  }
+
+  private clearAddressConfirmation(): void {
+    this.pendingAddressConfirmation = null;
+    const confirmationEl = this.container.querySelector('#geo-address-confirmation');
+    if (confirmationEl) {
+      confirmationEl.classList.add('hidden');
+      confirmationEl.innerHTML = '';
+    }
+  }
+
+  private renderPendingAddressConfirmation(): void {
+    if (this.pendingAddressConfirmation?.confirmation) {
+      this.showAddressConfirmation(this.pendingAddressConfirmation);
+    }
+  }
+
+  private async handleAddressConfirmationAction(action: string): Promise<void> {
+    const pending = this.pendingAddressConfirmation;
+    if (!pending?.confirmation) return;
+
+    if (action === 'accept') {
+      this.applyGeoResult(pending, true);
+      this.clearAddressConfirmation();
+      return;
+    }
+
+    if (action === 'edit') {
+      this.clearAddressConfirmation();
+      const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+      input?.focus();
+      input?.select();
+      return;
+    }
+
+    if (action === 'suggestions') {
+      const query = pending.confirmation.originalAddress;
+      this.clearAddressConfirmation();
+      await this.handleAddressSearch(query, false);
+    }
+  }
+
+  private showAddressConfirmation(result: AddressSearchResult): void {
+    const confirmation = result.confirmation;
+    const confirmationEl = this.container.querySelector('#geo-address-confirmation');
+    if (!confirmation || !confirmationEl) return;
+
+    this.pendingAddressConfirmation = result;
+    const hasCoordinates = Boolean(result.coords);
+    confirmationEl.innerHTML = `
+      <div class="rounded-lg border border-amber-500/60 bg-amber-950/30 p-3 text-[11px] text-amber-100 space-y-2">
+        <div class="font-semibold text-amber-200">⚠️ Geodata змінила або не підтвердила адресу</div>
+        <p><span class="text-amber-300/70">Почута адреса:</span> ${escapeHtml(confirmation.originalAddress)}</p>
+        <p><span class="text-amber-300/70">Geodata пропонує:</span> ${escapeHtml(confirmation.resolvedAddress)}</p>
+        ${confirmation.reasons.length > 0 ? `
+          <ul class="list-disc list-inside text-amber-200/80 space-y-0.5">
+            ${confirmation.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}
+          </ul>
+        ` : ''}
+        <p class="text-amber-200/80">Координати ${hasCoordinates ? 'знайдено, але вони не будуть застосовані без рішення оператора.' : 'не знайдено.'}</p>
+        <div class="flex flex-wrap gap-2 pt-1">
+          <button type="button" data-address-confirmation="accept" class="px-2.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold transition-colors">Прийняти адресу Geodata</button>
+          <button type="button" data-address-confirmation="edit" class="px-2.5 py-1.5 rounded-md border border-amber-400/50 hover:bg-amber-900/40 text-amber-100 font-semibold transition-colors">Редагувати</button>
+          <button type="button" data-address-confirmation="suggestions" class="px-2.5 py-1.5 rounded-md border border-amber-400/50 hover:bg-amber-900/40 text-amber-100 font-semibold transition-colors">Шукати варіанти</button>
+        </div>
+      </div>
+    `;
+    confirmationEl.classList.remove('hidden');
   }
 
   /**
@@ -670,9 +751,20 @@ export class TicketFormPanelComponent {
     const currentCoords = (this.store.getFormData().coordinates || '').trim();
     if (currentCoords) return;
 
-    const coords = await geocodingService.getCoordinates(address);
-    if (coords && !(this.store.getFormData().coordinates || '').trim()) {
-      this.store.updateFormField('coordinates', coords);
+    const results = await geocodingService.searchWithResults(address, { resolveExact: true });
+    const result = results[0];
+    if (!result || (this.store.getFormData().coordinates || '').trim()) return;
+
+    if (result.confirmation) {
+      this.showAddressConfirmation(result);
+      return;
+    }
+
+    if (result.coords) {
+      // Preserve the spoken/raw address in the form. A confirmed point is
+      // attached to it, but the canonical Geodata text is only written after
+      // an explicit operator choice.
+      this.store.applyGeocodedAddress(undefined, result.coords);
     }
   }
 
@@ -689,6 +781,7 @@ export class TicketFormPanelComponent {
       resultsEl.classList.add('hidden');
       resultsEl.innerHTML = '';
     }
+    this.clearAddressConfirmation();
 
     if (!query) {
       if (statusEl) {
@@ -704,8 +797,15 @@ export class TicketFormPanelComponent {
     if (!resultsEl || !statusEl) return;
 
     if (results.length === 0) {
-      statusEl.textContent = 'Адресу не знайдено. Спробуйте уточнити запит (місто, вулиця, будинок).';
+      statusEl.textContent = resolveExact
+        ? 'FullAddress не розпізнав адресу. Перевірте місто, назву вулиці та номер будинку або скористайтеся ручним пошуком.'
+        : 'Варіантів адреси не знайдено. Спробуйте уточнити запит (місто, вулиця, будинок).';
       statusEl.classList.remove('hidden');
+      return;
+    }
+
+    if (resolveExact && results.length === 1 && results[0].confirmation) {
+      this.showAddressConfirmation(results[0]);
       return;
     }
 
@@ -723,7 +823,7 @@ export class TicketFormPanelComponent {
         <button type="button" data-geo-index="${index}" class="w-full text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/50 transition-all cursor-pointer">
           <div class="text-xs font-semibold text-slate-100">${escapeHtml(item.AddressString || '')}</div>
           <div class="text-[10px] text-slate-400 mt-0.5">
-            ${item.Index_ ? `Індекс: ${escapeHtml(item.Index_)} · ` : ''}${item.CityDistrict ? `Район: ${escapeHtml(item.CityDistrict)} · ` : ''}${coords ? `Координати: <span class="font-mono text-emerald-400">${escapeHtml(coords)}</span>` : 'Координати відсутні'}
+            ${result.source === 'geodata-autocomplete' ? 'Варіант Address · після вибору буде перевірений через FullAddress · ' : ''}${item.Index_ ? `Індекс: ${escapeHtml(item.Index_)} · ` : ''}${item.CityDistrict ? `Район: ${escapeHtml(item.CityDistrict)} · ` : ''}${coords ? `Координати: <span class="font-mono text-emerald-400">${escapeHtml(coords)}</span>` : 'Координати відсутні'}
           </div>
         </button>
       `;
@@ -732,7 +832,19 @@ export class TicketFormPanelComponent {
     resultsEl.classList.remove('hidden');
   }
 
-  private applyGeoResult(result: AddressSearchResult): void {
+  private applyGeoResult(result: AddressSearchResult, operatorConfirmed: boolean = false): void {
+    if (result.confirmation && !operatorConfirmed) {
+      this.showAddressConfirmation(result);
+      return;
+    }
+
+    // Address is only an autocomplete endpoint. A manually chosen candidate
+    // still goes through FullAddress before its point can enter a ticket.
+    if (result.source === 'geodata-autocomplete' && result.item.AddressString) {
+      void this.handleAddressSearch(result.item.AddressString, true);
+      return;
+    }
+
     if (result.coords) {
       this.store.applyGeocodedAddress(result.item.AddressString, result.coords);
     } else if (result.item.AddressString) {
