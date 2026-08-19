@@ -456,6 +456,7 @@ export class TicketFormPanelComponent {
           // keystroke. A full render would replace this input and lose focus.
           this.store.updateFormField(fieldKey, target.value, false);
           if (fieldKey === 'addressText') {
+            this.clearAddressConfirmation();
             // Editing clears the previous point in the store. Reset the
             // attempt cache too: the operator may correct a typo and return to
             // an address that was successfully geocoded earlier in this draft.
@@ -472,6 +473,7 @@ export class TicketFormPanelComponent {
           // Commit validation and dependent UI after the operator completes an edit.
           this.store.updateFormField(fieldKey, target.value);
           if (fieldKey === 'addressText') {
+            this.clearAddressConfirmation();
             this.autoGeoAttempted = null;
           }
         }
@@ -649,6 +651,7 @@ export class TicketFormPanelComponent {
 
   private lastGeoSearchResults: AddressSearchResult[] = [];
   private pendingAddressConfirmation: AddressSearchResult | null = null;
+  private pendingAddressConfirmationForAddress: string | null = null;
   private geoSearchTimer: number | null = null;
   private autoGeoTimer: number | null = null;
   private autoGeoAttempted: string | null = null;
@@ -673,6 +676,7 @@ export class TicketFormPanelComponent {
 
   private clearAddressConfirmation(): void {
     this.pendingAddressConfirmation = null;
+    this.pendingAddressConfirmationForAddress = null;
     const confirmationEl = this.container.querySelector('#geo-address-confirmation');
     if (confirmationEl) {
       confirmationEl.classList.add('hidden');
@@ -689,6 +693,14 @@ export class TicketFormPanelComponent {
   private async handleAddressConfirmationAction(action: string): Promise<void> {
     const pending = this.pendingAddressConfirmation;
     if (!pending?.confirmation) return;
+
+    const currentAddress = this.store.getFormData().addressText.trim();
+    if (this.pendingAddressConfirmationForAddress !== currentAddress) {
+      // Never apply a FullAddress candidate that was produced before the
+      // operator changed the incident address.
+      this.clearAddressConfirmation();
+      return;
+    }
 
     if (action === 'accept') {
       this.applyGeoResult(pending, true);
@@ -716,6 +728,11 @@ export class TicketFormPanelComponent {
     const confirmationEl = this.container.querySelector('#geo-address-confirmation');
     if (!confirmation || !confirmationEl) return;
 
+    if (this.pendingAddressConfirmation === null) {
+      // Capture the address only when this candidate first appears. A later
+      // unrelated render must not rebind an old candidate to a new draft.
+      this.pendingAddressConfirmationForAddress = this.store.getFormData().addressText.trim();
+    }
     this.pendingAddressConfirmation = result;
     const hasCoordinates = Boolean(result.coords);
     confirmationEl.innerHTML = `
