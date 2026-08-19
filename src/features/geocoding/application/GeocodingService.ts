@@ -107,6 +107,13 @@ class GeocodingService {
       });
     }
 
+    // The list is always an operator choice. In auto mode Nominatim can
+    // therefore supplement an empty Address autocomplete response without
+    // restoring the unsafe automatic-coordinate fallback.
+    if (results.length === 0 && this.provider === 'auto') {
+      results.push(...await nominatimService.search(addressStr));
+    }
+
     return results;
   }
 }

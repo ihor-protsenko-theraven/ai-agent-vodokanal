@@ -8,6 +8,8 @@ import { geocodingService, AddressSearchResult, GeocodingProvider } from '@/feat
 import { formatDateTimeInput } from '@/shared/utils/wsn';
 import { withSelectedOption } from '@/features/tickets/domain/selectOptions';
 
+const GEO_SEARCH_INPUT_SELECTOR = '#geo-search-input';
+
 export class TicketFormPanelComponent {
   private store: TicketStateStore;
   private container: HTMLElement;
@@ -456,7 +458,10 @@ export class TicketFormPanelComponent {
           // keystroke. A full render would replace this input and lose focus.
           this.store.updateFormField(fieldKey, target.value, false);
           if (fieldKey === 'addressText') {
-            this.clearAddressConfirmation();
+            // Results and confirmations belong only to the previous address.
+            this.clearGeoResults();
+            const geoSearchInput = this.container.querySelector<HTMLInputElement>(GEO_SEARCH_INPUT_SELECTOR);
+            if (geoSearchInput) geoSearchInput.value = target.value;
             // Editing clears the previous point in the store. Reset the
             // attempt cache too: the operator may correct a typo and return to
             // an address that was successfully geocoded earlier in this draft.
@@ -473,7 +478,7 @@ export class TicketFormPanelComponent {
           // Commit validation and dependent UI after the operator completes an edit.
           this.store.updateFormField(fieldKey, target.value);
           if (fieldKey === 'addressText') {
-            this.clearAddressConfirmation();
+            this.clearGeoResults();
             this.autoGeoAttempted = null;
           }
         }
@@ -560,7 +565,7 @@ export class TicketFormPanelComponent {
 
     // Geodata address search
     const btnGeoSearch = this.container.querySelector('#btn-geo-search');
-    const geoSearchInput = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+    const geoSearchInput = this.container.querySelector<HTMLInputElement>(GEO_SEARCH_INPUT_SELECTOR);
     if (btnGeoSearch && geoSearchInput) {
       const runSearch = () => this.handleAddressSearch(
         geoSearchInput.value || this.store.getFormData().addressText || '',
@@ -612,7 +617,7 @@ export class TicketFormPanelComponent {
         // immediate retry of the unchanged address through the newly selected one.
         this.autoGeoAttempted = null;
         this.scheduleAutoGeocode();
-        const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+        const input = this.container.querySelector<HTMLInputElement>(GEO_SEARCH_INPUT_SELECTOR);
         if (input && input.value.trim().length >= uiConfig.GEO_SEARCH_MIN_CHARS) {
           this.handleAddressSearch(input.value, false);
         }
@@ -684,6 +689,14 @@ export class TicketFormPanelComponent {
     }
   }
 
+  private setGeoSearchStatus(message: string): void {
+    const statusEl = this.container.querySelector('#geo-search-status');
+    if (!statusEl) return;
+
+    statusEl.textContent = message;
+    statusEl.classList.remove('hidden');
+  }
+
   private renderPendingAddressConfirmation(): void {
     if (this.pendingAddressConfirmation?.confirmation) {
       this.showAddressConfirmation(this.pendingAddressConfirmation);
@@ -710,7 +723,7 @@ export class TicketFormPanelComponent {
 
     if (action === 'edit') {
       this.clearAddressConfirmation();
-      const input = this.container.querySelector<HTMLInputElement>('#geo-search-input');
+      const input = this.container.querySelector<HTMLInputElement>(GEO_SEARCH_INPUT_SELECTOR);
       input?.focus();
       input?.select();
       return;
@@ -756,6 +769,16 @@ export class TicketFormPanelComponent {
     confirmationEl.classList.remove('hidden');
   }
 
+  private getAddressSearchSourceLabel(source: AddressSearchResult['source']): string {
+    if (source === 'geodata-autocomplete') {
+      return 'Варіант Address · після вибору буде перевірений через FullAddress · ';
+    }
+    if (source === 'nominatim') {
+      return 'Варіант Nominatim · потребує вибору оператора · ';
+    }
+    return '';
+  }
+
   /**
    * Auto-geocode the address when it changes and coordinates are still empty.
    */
@@ -772,12 +795,16 @@ export class TicketFormPanelComponent {
 
   private async runAutoGeocode(address: string): Promise<void> {
     this.autoGeoAttempted = address;
-    const currentCoords = (this.store.getFormData().coordinates || '').trim();
-    if (currentCoords) return;
+    if (!this.hasCurrentUnresolvedAddress(address)) return;
 
     const results = await geocodingService.searchWithResults(address, { resolveExact: true });
     const result = results[0];
-    if (!result || (this.store.getFormData().coordinates || '').trim()) return;
+    if (!this.hasCurrentUnresolvedAddress(address)) return;
+
+    if (!result) {
+      await this.showManualSuggestionsForUnresolvedAutoAddress(address);
+      return;
+    }
 
     if (result.confirmation) {
       this.showAddressConfirmation(result);
@@ -789,7 +816,42 @@ export class TicketFormPanelComponent {
       // attached to it, but the canonical Geodata text is only written after
       // an explicit operator choice.
       this.store.applyGeocodedAddress(undefined, result.coords);
+      this.showConfirmedAutoAddress(address, result);
+      return;
     }
+
+    this.showAddressWithoutCoordinates(address, result);
+  }
+
+  private hasCurrentUnresolvedAddress(address: string): boolean {
+    const formData = this.store.getFormData();
+    return formData.addressText.trim() === address && !formData.coordinates.trim();
+  }
+
+  private async showManualSuggestionsForUnresolvedAutoAddress(address: string): Promise<void> {
+    // FullAddress did not resolve the spoken address. Show only manually
+    // selectable alternatives; no suggestion is allowed to set a point by
+    // itself.
+    await this.handleAddressSearch(address, false);
+    if (!this.hasCurrentUnresolvedAddress(address)) return;
+
+    this.setGeoSearchStatus(
+      this.lastGeoSearchResults.length > 0
+        ? 'FullAddress не розпізнав адресу. Оберіть один із варіантів вручну або відредагуйте адресу.'
+        : 'FullAddress не розпізнав адресу. Перевірте місто, назву вулиці та номер будинку.'
+    );
+  }
+
+  private showConfirmedAutoAddress(address: string, result: AddressSearchResult): void {
+    this.setGeoSearchStatus(
+      `Адресу підтверджено через FullAddress. Почута: ${address}. Geodata: ${result.item.AddressString || address}. Координати: ${result.coords}.`
+    );
+  }
+
+  private showAddressWithoutCoordinates(address: string, result: AddressSearchResult): void {
+    this.setGeoSearchStatus(
+      `Geodata розпізнала адресу. Почута: ${address}. Geodata: ${result.item.AddressString || address}. Точних координат будинку немає — уточніть адресу або введіть координати вручну.`
+    );
   }
 
   private async handleAddressSearch(rawQuery: string, resolveExact: boolean = false): Promise<void> {
@@ -815,14 +877,21 @@ export class TicketFormPanelComponent {
       return;
     }
 
-    const results = await geocodingService.searchWithResults(query, { resolveExact });
+    let results = await geocodingService.searchWithResults(query, { resolveExact });
+    // A click on "Пошук" first tries FullAddress. When it cannot resolve an
+    // address, continue with Address only to show manually selectable
+    // candidates. Auto-geocoding intentionally does not take this path.
+    const isAutocompleteFallback = resolveExact && results.length === 0;
+    if (isAutocompleteFallback) {
+      results = await geocodingService.searchWithResults(query);
+    }
     this.lastGeoSearchResults = results;
 
     if (!resultsEl || !statusEl) return;
 
     if (results.length === 0) {
       statusEl.textContent = resolveExact
-        ? 'FullAddress не розпізнав адресу. Перевірте місто, назву вулиці та номер будинку або скористайтеся ручним пошуком.'
+        ? 'FullAddress не розпізнав адресу, а варіантів для ручного вибору не знайдено. Перевірте місто, назву вулиці та номер будинку.'
         : 'Варіантів адреси не знайдено. Спробуйте уточнити запит (місто, вулиця, будинок).';
       statusEl.classList.remove('hidden');
       return;
@@ -835,7 +904,7 @@ export class TicketFormPanelComponent {
 
     // A full-address search that returned one exact point needs no extra click.
     // This also makes the separate "Пошук адреси" input behave like users expect.
-    if (resolveExact && results.length === 1 && results[0].coords) {
+    if (resolveExact && !isAutocompleteFallback && results.length === 1 && results[0].coords) {
       this.applyGeoResult(results[0]);
       return;
     }
@@ -847,7 +916,7 @@ export class TicketFormPanelComponent {
         <button type="button" data-geo-index="${index}" class="w-full text-left p-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/50 transition-all cursor-pointer">
           <div class="text-xs font-semibold text-slate-100">${escapeHtml(item.AddressString || '')}</div>
           <div class="text-[10px] text-slate-400 mt-0.5">
-            ${result.source === 'geodata-autocomplete' ? 'Варіант Address · після вибору буде перевірений через FullAddress · ' : ''}${item.Index_ ? `Індекс: ${escapeHtml(item.Index_)} · ` : ''}${item.CityDistrict ? `Район: ${escapeHtml(item.CityDistrict)} · ` : ''}${coords ? `Координати: <span class="font-mono text-emerald-400">${escapeHtml(coords)}</span>` : 'Координати відсутні'}
+            ${this.getAddressSearchSourceLabel(result.source)}${item.Index_ ? `Індекс: ${escapeHtml(item.Index_)} · ` : ''}${item.CityDistrict ? `Район: ${escapeHtml(item.CityDistrict)} · ` : ''}${coords ? `Координати: <span class="font-mono text-emerald-400">${escapeHtml(coords)}</span>` : 'Координати відсутні'}
           </div>
         </button>
       `;
