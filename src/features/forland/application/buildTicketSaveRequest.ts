@@ -66,6 +66,11 @@ export function buildTicketSaveRequest({
   };
 }
 
+/**
+ * The form and address providers use WGS 84 in `latitude, longitude` order.
+ * Forland accepts several projections, so label the geometry explicitly instead
+ * of relying on its default Web Mercator (EPSG:3857) interpretation.
+ */
 function toForlandCoordinates(coordinates: string): string | Record<string, unknown> {
   const [latitude = '', longitude = '', ...rest] = coordinates.split(',').map((value) => value.trim());
   const lat = Number(latitude);
@@ -77,12 +82,15 @@ function toForlandCoordinates(coordinates: string): string | Record<string, unkn
     && longitude.length > 0
     && Number.isFinite(lat)
     && Number.isFinite(lon)
+    && Math.abs(lat) <= 90
+    && Math.abs(lon) <= 180
   ) {
     return {
-      wkt: `POINT(${lon} ${lat})`,
-      center: null,
-      needProcessing: true,
-      z: null
+      [wsnConfig.GEOMETRY_PROJECTIONS.WGS84]: {
+        // WKT coordinates are always x/y, therefore longitude/latitude.
+        // Other Forland geometry fields are optional and deliberately omitted.
+        wkt: `POINT (${lon} ${lat})`
+      }
     };
   }
 
