@@ -74,6 +74,23 @@ describe('Geodata coordinate extraction', () => {
     await expect(geodataService.getCoordinates(spokenAddress)).resolves.toBeNull();
   });
 
+  it('withholds coordinates for a type-less address when FullAddress changes its street', async () => {
+    vi.spyOn(geodataService, 'getFullAddress').mockResolvedValue({
+      AddressString: 'місто Київ, вул. Рейтерська, 20',
+      City: 'Київ',
+      Street: 'Рейтерська',
+      HouseNum: '20',
+      Lat: '50.454321',
+      Long: '30.512345'
+    });
+
+    await expect(geodataService.resolveAddress('Хрещатик 20')).resolves.toMatchObject({
+      requiresOperatorConfirmation: true,
+      confirmationReasons: ['вулиця: «Хрещатик» → «Рейтерська»']
+    });
+    await expect(geodataService.getCoordinates('Хрещатик 20')).resolves.toBeNull();
+  });
+
   it('uses the Cities → Streets → Houses chain only when FullAddress has no exact point', async () => {
     vi.spyOn(geodataService, 'getFullAddress').mockResolvedValue({
       City: 'Київ',

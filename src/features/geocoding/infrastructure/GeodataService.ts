@@ -394,7 +394,7 @@ class GeodataService {
       const normalized = word.toLocaleLowerCase('uk-UA');
       return geoConfig.STREET_TYPE_KEYWORDS.some((keyword) => normalized.startsWith(keyword));
     });
-    if (typeIndex === -1) return null;
+    if (typeIndex === -1) return this.extractTypeLessStreetName(value);
 
     const followingWords = words.slice(typeIndex + 1);
     const stopIndex = followingWords.findIndex((word, index) => {
@@ -410,6 +410,23 @@ class GeodataService {
 
     const streetWords = followingWords.slice(0, stopIndex === -1 ? 3 : stopIndex);
     return streetWords.join(' ').trim() || null;
+  }
+
+  /**
+   * The voice parser permits a type-less address only after an explicit cue,
+   * e.g. "за адресою Хрещатик 20". The cue is removed before FullAddress is
+   * called, so recognise this compact "street house" form here as well.
+   * Returning a false positive only asks the operator to review; returning
+   * null could silently attach coordinates from a different street.
+   */
+  private extractTypeLessStreetName(value: string): string | null {
+    const houseIndex = value.search(/\d/u);
+    if (houseIndex <= 0) return null;
+
+    const wordsBeforeHouse = value.slice(0, houseIndex).match(/[\p{L}'’-]+/gu) ?? [];
+    if (wordsBeforeHouse.length === 0 || wordsBeforeHouse.length > 3) return null;
+
+    return wordsBeforeHouse.join(' ').trim() || null;
   }
 
   private isSimilarStreet(first: string, second: string): boolean {

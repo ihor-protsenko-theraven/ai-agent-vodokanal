@@ -456,6 +456,10 @@ export class TicketFormPanelComponent {
           // keystroke. A full render would replace this input and lose focus.
           this.store.updateFormField(fieldKey, target.value, false);
           if (fieldKey === 'addressText') {
+            // Editing clears the previous point in the store. Reset the
+            // attempt cache too: the operator may correct a typo and return to
+            // an address that was successfully geocoded earlier in this draft.
+            this.autoGeoAttempted = null;
             this.scheduleAutoGeocode();
           }
         }
@@ -467,6 +471,9 @@ export class TicketFormPanelComponent {
         if (fieldKey) {
           // Commit validation and dependent UI after the operator completes an edit.
           this.store.updateFormField(fieldKey, target.value);
+          if (fieldKey === 'addressText') {
+            this.autoGeoAttempted = null;
+          }
         }
       });
     });
