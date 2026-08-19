@@ -3,6 +3,14 @@
 All notable changes to this project are recorded in this file. The project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [2.8.1](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.8.0...v2.8.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* serialize Forland coordinates as EPSG 4326 ([f053594](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/f05359414a6c640496873f0b8fa596fca9f652c3))
+* serialize Forland coordinates as EPSG 4326 ([a64553f](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/a64553f3c6aa79a8429747506ab93741e375b781))
+
 ## [2.8.0](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.7.0...v2.8.0) (2026-08-18)
 
 
