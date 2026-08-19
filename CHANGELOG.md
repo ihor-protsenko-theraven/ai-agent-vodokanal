@@ -3,6 +3,17 @@
 All notable changes to this project are recorded in this file. The project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [2.9.0](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.8.1...v2.9.0) (2026-08-19)
+
+
+### Features
+
+* enhance geocoding and address confirmation features ([c7e93ff](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/c7e93ff2be125b63b424685d0d165a8c9fd1a1ce))
+* enhance geocoding and address confirmation features ([7097e00](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/7097e005ac71960c9770c9ce6f2ef08312e9c018))
+* enhance geocoding and address handling in TicketFormPanel ([0b48c35](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/0b48c35d0544f501d734b50e52bbadb02e50b756))
+* improve address confirmation handling in TicketFormPanel ([df1282d](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/df1282da1e65e1d3c4ed5c510377b45b2aece3b6))
+* improve geocoding logic for type-less addresses and enhance tests ([2db8be3](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/commit/2db8be3be1886f8e4fb02ec7d79affb29c9d9c64))
+
 ## [2.8.1](https://github.com/ihor-protsenko-theraven/ai-agent-vodokanal/compare/v2.8.0...v2.8.1) (2026-08-19)
 
 
