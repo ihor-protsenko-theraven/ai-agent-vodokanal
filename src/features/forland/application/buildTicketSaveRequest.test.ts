@@ -53,10 +53,9 @@ describe('buildTicketSaveRequest', () => {
       [wsnConfig.PROPERTIES.INCIDENT_DATE_TIME]: formatForlandDateTimeMinutePrecision(incidentDate),
       [wsnConfig.PROPERTIES.DOCUMENT_DATE]: formatForlandDateTimeMinutePrecisionWithTimezone(now),
       [wsnConfig.PROPERTIES.COORDINATES]: {
-        wkt: 'POINT(30.5230925 50.4498465)',
-        center: null,
-        needProcessing: true,
-        z: null
+        EPSG_4326: {
+          wkt: 'POINT (30.5230925 50.4498465)'
+        }
       },
       [wsnConfig.PROPERTIES.INIT_FIELD_1268]: ['initial value'],
       [wsnConfig.PROPERTIES.INIT_FIELD_1954]: [],

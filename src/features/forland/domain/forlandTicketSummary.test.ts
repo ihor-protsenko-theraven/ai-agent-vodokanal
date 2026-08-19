@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { formatForlandAddress, formatForlandCoordinates, sortUnclosedTickets, toUnclosedTicketSummary } from '@/features/forland/domain/forlandTicketSummary';
 
 describe('Forland active-ticket summary', () => {
-  it('converts POINT(longitude latitude) WKT into the form coordinate format', () => {
-    expect(formatForlandCoordinates({ wkt: 'POINT(30.5234 50.4501)' })).toBe('50.4501, 30.5234');
+  it('converts EPSG:4326 POINT(longitude latitude) WKT into the form coordinate format', () => {
+    expect(formatForlandCoordinates({ EPSG_4326: { wkt: 'POINT (30.5234 50.4501)' } })).toBe('50.4501, 30.5234');
   });
 
-  it('does not mislabel projected WKT values as latitude and longitude', () => {
-    expect(formatForlandCoordinates({ wkt: 'POINT(6523021.451807455 3377767.93735557)' })).toBe('');
+  it('converts EPSG:3857 WKT instead of mislabeling projected values as WGS 84', () => {
+    expect(formatForlandCoordinates({ EPSG_3857: { wkt: 'POINT (3588290.9083620547 6188904.114786299)' } }))
+      .toBe('48.49083426840647, 32.23416566848755');
   });
 
   it('removes empty system placeholders from the address', () => {
@@ -23,7 +24,7 @@ describe('Forland active-ticket summary', () => {
       Init: {
         Properties: {
           f_389: 'м. Київ, вул. Хрещатик, 15',
-          f_420: { wkt: 'POINT(30.5234 50.4501)' },
+          f_420: { EPSG_4326: { wkt: 'POINT (30.5234 50.4501)' } },
           f1981: '+380000000000'
         }
       }

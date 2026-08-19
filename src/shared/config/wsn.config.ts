@@ -12,6 +12,10 @@ export const wsnConfig = {
   OPERATOR_ID: 'OPERATOR-402',
   OPERATOR_DISPLAY: '#402 (WSN-AUTH)',
   SERVICE_ACCOUNT: 'WSN-AI-AGENT-SERVICE',
+  GEOMETRY_PROJECTIONS: {
+    WGS84: 'EPSG_4326',
+    WEB_MERCATOR: 'EPSG_3857'
+  },
   // State IDs for unclosed tickets (active states that should be checked for duplicates)
   UNCLOSED_STATE_IDS: [5041, 5996, 5999, 5003], // Different active ticket states
   PROPERTIES: {
