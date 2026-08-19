@@ -44,6 +44,53 @@ describe('Geodata coordinate extraction', () => {
     });
   });
 
+  it('sends the FullAddress request exactly as extracted from the call', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]', { status: 200 }));
+    const spokenAddress = 'вулиці регана в місті Києві на 8А';
+
+    await geodataService.getFullAddress(spokenAddress);
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(url.searchParams.get('sRequest')).toBe(spokenAddress);
+  });
+
+  it('withholds coordinates when FullAddress resolves a materially different street', async () => {
+    vi.spyOn(geodataService, 'getFullAddress').mockResolvedValue({
+      AddressString: 'місто Київ, вул. Рейтерська, 8А',
+      City: 'Київ',
+      Street: 'Рейтерська',
+      HouseNum: '8А',
+      Lat: '50.454321',
+      Long: '30.512345'
+    });
+    const spokenAddress = 'вулиці Регана в місті Києві на 8А';
+
+    await expect(geodataService.resolveAddress(spokenAddress)).resolves.toMatchObject({
+      coordinates: '50.454321, 30.512345',
+      requiresOperatorConfirmation: true,
+      resolvedAddress: 'місто Київ, вул. Рейтерська, 8А',
+      confirmationReasons: ['вулиця: «Регана» → «Рейтерська»']
+    });
+    await expect(geodataService.getCoordinates(spokenAddress)).resolves.toBeNull();
+  });
+
+  it('withholds coordinates for a type-less address when FullAddress changes its street', async () => {
+    vi.spyOn(geodataService, 'getFullAddress').mockResolvedValue({
+      AddressString: 'місто Київ, вул. Рейтерська, 20',
+      City: 'Київ',
+      Street: 'Рейтерська',
+      HouseNum: '20',
+      Lat: '50.454321',
+      Long: '30.512345'
+    });
+
+    await expect(geodataService.resolveAddress('Хрещатик 20')).resolves.toMatchObject({
+      requiresOperatorConfirmation: true,
+      confirmationReasons: ['вулиця: «Хрещатик» → «Рейтерська»']
+    });
+    await expect(geodataService.getCoordinates('Хрещатик 20')).resolves.toBeNull();
+  });
+
   it('uses the Cities → Streets → Houses chain only when FullAddress has no exact point', async () => {
     vi.spyOn(geodataService, 'getFullAddress').mockResolvedValue({
       City: 'Київ',

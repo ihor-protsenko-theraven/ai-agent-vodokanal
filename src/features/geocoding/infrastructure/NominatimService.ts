@@ -95,7 +95,8 @@ class NominatimService {
         Lat_: item.lat,
         Long_: item.lon
       },
-      coords
+      coords,
+      source: 'nominatim'
     };
   }
 

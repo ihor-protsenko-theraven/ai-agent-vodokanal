@@ -3,9 +3,8 @@
  * Extracts city, street and house number from unstructured speech transcripts.
  */
 
-import { geoConfig, nlpConfig, speechConfig } from '@/shared/config';
+import { geoConfig, speechConfig } from '@/shared/config';
 import { ParsedAddress } from '@/shared/types/nlp';
-import { capitalizeFirst } from '@/shared/utils/text';
 
 const UKRAINIAN_WORD = `[а-яіїєґ][а-яіїєґ'’-]*`;
 const STREET_TYPE = '(?:вул(?:[.]|иц(?:я|і|ю|е))?|просп(?:[.]|ект)?|пров(?:[.]|улок)?|бульв(?:ар|[.])?|бул[.]|майдан|наб(?:ережна|[.])?|площ(?:а|[.])?)';
@@ -33,10 +32,10 @@ export class UkrainianAddressParser {
 
     const explicitMatch = text.match(EXPLICIT_STREET_PATTERN);
     if (explicitMatch) {
-      const street = this.normalizeStreetName(explicitMatch[1].trim());
-      const house = explicitMatch[2].trim();
       return {
-        fullAddress: `м. ${city}, вул. ${street}, ${house}`,
+        // Keep the spoken fragment as-is. FullAddress, rather than browser
+        // NLP, is responsible for interpreting Ukrainian cases and typos.
+        fullAddress: explicitMatch[0].trim(),
         city,
         hasStreet: true,
         hasHouseNumber: true
@@ -45,22 +44,18 @@ export class UkrainianAddressParser {
 
     const cueMatch = text.match(CUE_ADDRESS_PATTERN);
     if (cueMatch) {
-      const street = this.normalizeStreetName(cueMatch[1].trim());
-      const house = cueMatch[2].trim();
-      if (!this.isStreetTypeWord(street) && !this.isReservedKeyword(street)) {
-        return {
-          fullAddress: `м. ${city}, вул. ${street}, ${house}`,
-          city,
-          hasStreet: true,
-          hasHouseNumber: true
-        };
-      }
+      return {
+        fullAddress: this.removeAddressCue(cueMatch[0]),
+        city,
+        hasStreet: true,
+        hasHouseNumber: true
+      };
     }
 
     const streetOnlyMatch = text.match(STREET_ONLY_PATTERN);
     if (streetOnlyMatch) {
       return {
-        fullAddress: `м. ${city}, вул. ${this.normalizeStreetName(streetOnlyMatch[1])}`,
+        fullAddress: streetOnlyMatch[0].trim(),
         city,
         hasStreet: true,
         hasHouseNumber: false
@@ -102,22 +97,9 @@ export class UkrainianAddressParser {
     return city;
   }
 
-  private normalizeStreetName(streetStr: string): string {
-    const clean = streetStr.trim().toLowerCase();
-
-    for (const [alias, name] of Object.entries(nlpConfig.STREET_ALIASES)) {
-      if (clean.includes(alias)) return name;
-    }
-
-    return capitalizeFirst(clean);
-  }
-
-  private isReservedKeyword(word: string): boolean {
-    return nlpConfig.RESERVED_KEYWORDS.includes(word.toLowerCase());
-  }
-
-  private isStreetTypeWord(candidate: string): boolean {
-    const firstToken = candidate.split(/\s+/)[0].toLowerCase();
-    return geoConfig.STREET_TYPE_KEYWORDS.some((keyword) => firstToken.startsWith(keyword));
+  private removeAddressCue(value: string): string {
+    return value
+      .replace(/^(?:за\s+адрес(?:ою|ою)|адрес[аи])\s*[:,-]?\s*/iu, '')
+      .trim();
   }
 }

@@ -409,6 +409,14 @@ export class TicketStateStore {
   public updateFormField<K extends keyof WsnTicketData>(field: K, value: WsnTicketData[K], notify: boolean = true): void {
     this.formData[field] = value;
     if (field === 'addressText') {
+      // Coordinates belong to the previous address until Geodata confirms the
+      // edited one. Keeping them would create a ticket at the wrong location.
+      this.formData.coordinates = '';
+      this.verifications.coordinates = false;
+      this.result.confidence.geocoding = Math.min(
+        this.result.confidence.geocoding,
+        aiConfig.CONFIDENCE_SCORES.GEOCODING_VAGUE
+      );
       this.result.duplicatesFound = [];
       this.result.duplicateCheckStatus = String(value).trim() ? 'REQUIRED' : undefined;
       this.dismissedDuplicateTicketIds.clear();

@@ -33,14 +33,10 @@ class GeocodingService {
       return nominatimService.geocode(addressStr);
     }
 
-    const geodataCoords = await geodataService.getCoordinates(addressStr);
-    if (geodataCoords) return geodataCoords;
-
-    if (this.provider === 'auto') {
-      return nominatimService.geocode(addressStr);
-    }
-
-    return null;
+    // In auto mode FullAddress is the only automatic authority. Nominatim is
+    // still available as an explicitly selected source, but must not replace a
+    // failed or ambiguous Ukrainian address with an unreviewed point.
+    return geodataService.getCoordinates(addressStr);
   }
 
   /**
@@ -77,15 +73,27 @@ class GeocodingService {
     // a 404 from the autocomplete endpoint as an address-resolution failure.
     if (options.resolveExact) {
       const resolved = await geodataService.resolveAddress(addressStr);
-      if (resolved?.coordinates) {
+      if (resolved) {
         return [{
           item: {
             ...resolved.address,
-            AddressString: resolved.address.AddressString || resolved.address.SourceAddress || addressStr
+            AddressString: resolved.resolvedAddress
           },
-          coords: resolved.coordinates
+          coords: resolved.coordinates,
+          source: 'geodata-full',
+          confirmation: resolved.requiresOperatorConfirmation
+            ? {
+                originalAddress: resolved.originalAddress,
+                resolvedAddress: resolved.resolvedAddress,
+                reasons: resolved.confirmationReasons
+              }
+            : undefined
         }];
       }
+
+      // A deliberate FullAddress search is not silently retried through the
+      // partial-input endpoint. The operator can request suggestions instead.
+      return [];
     }
 
     const results: AddressSearchResult[] = [];
@@ -94,10 +102,14 @@ class GeocodingService {
     for (const item of geodataResults) {
       results.push({
         item,
-        coords: geodataService.getCoordinatesString(item)
+        coords: geodataService.getCoordinatesString(item),
+        source: 'geodata-autocomplete'
       });
     }
 
+    // The list is always an operator choice. In auto mode Nominatim can
+    // therefore supplement an empty Address autocomplete response without
+    // restoring the unsafe automatic-coordinate fallback.
     if (results.length === 0 && this.provider === 'auto') {
       results.push(...await nominatimService.search(addressStr));
     }
