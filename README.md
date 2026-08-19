@@ -156,18 +156,37 @@ messages. When that PR is merged, it automatically:
 Vercel creates a preview deployment for the Release PR and a production
 deployment after it is merged into `main`.
 
-Use these commit prefixes for releasable work:
+Release Please reads the commit that actually lands in `main`. As this project
+uses squash merge, set the **final squash commit title** to the appropriate
+Conventional Commit message, even if temporary commits in the feature branch
+have other names.
+
+Use these prefixes for releasable work:
 
 ```text
-fix: correct coordinate lookup       # patch: 2.4.0 → 2.4.1
-feat: add ticket edit workflow      # minor: 2.4.0 → 2.5.0
-feat!: change ticket API contract   # major: 2.4.0 → 3.0.0
+fix: serialize Forland coordinates as EPSG 4326  # patch: 2.8.0 → 2.8.1
+feat: add ticket edit workflow                    # minor: 2.8.0 → 2.9.0
+feat!: change ticket API contract                 # major: 2.8.0 → 3.0.0
 ```
 
 Use `fix:`, `feat:`, or a breaking-change marker for changes that should affect
 the published version; this keeps the version bump predictable for reviewers.
+Use `fix:` for a production bug correction, even when the implementation is a
+small refactor. For example, correcting a coordinate projection is a `fix:`,
+not a `refactor:`.
 
-The manifest starts at the existing `2.4.0` project version and the current
+The following prefixes do **not** create a Release Please PR by themselves:
+
+```text
+refactor:  internal restructuring with no user-visible correction
+docs:      documentation-only change
+test:      test-only change
+chore:     maintenance or tooling change
+ci:        workflow change
+style:     formatting-only change
+```
+
+The manifest starts at the existing `2.8.0` project version and the current
 Git revision, so historical commits are not treated as a new release.
 
 For the first run, GitHub repository administrators must allow workflow write
