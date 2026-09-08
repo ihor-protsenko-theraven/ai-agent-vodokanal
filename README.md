@@ -53,7 +53,8 @@ api/
 Unit tests live next to the module under test: `SomeModule.ts` and
 `SomeModule.test.ts`. Future integration and E2E tests belong in the root
 `tests/` directory. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for module
-boundaries and import rules.
+boundaries and import rules. See [docs/PRODUCTION_REQUIREMENTS.md](docs/PRODUCTION_REQUIREMENTS.md)
+for the client infrastructure, Asterisk telephony, and WSN production requirements checklist.
 
 ## Prerequisites
 
