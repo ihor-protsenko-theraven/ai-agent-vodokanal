@@ -44,6 +44,10 @@ export default defineConfig(() => ({
     port: 3000,
     open: true,
     proxy: {
+      '/api/asterisk': {
+        target: process.env.ASTERISK_BRIDGE_URL ?? 'http://127.0.0.1:3002',
+        changeOrigin: true
+      },
       '/forland': {
         target: 'https://wsn1.forland-solution.com',
         changeOrigin: true,

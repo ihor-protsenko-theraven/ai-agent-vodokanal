@@ -23,6 +23,8 @@ import {
   isLowConfidenceField,
   toTicketFormData
 } from '@/features/tickets/domain/ticketDraft';
+import { mergeAsteriskCallIntoDraft } from '@/features/asterisk/domain/asteriskModel';
+import { formatDateTimeInput } from '@/shared/utils/wsn';
 
 export type StateChangeListener = () => void;
 
@@ -36,6 +38,8 @@ export class TicketStateStore {
   private forceRegistrationUnlocked: boolean = false;
   private clarificationMode: ClarificationMode = 'TEXT_HINTS';
   private isCallIntercepted: boolean = false;
+  private phoneEditedByOperator: boolean = false;
+  private incidentEditedByOperator: boolean = false;
   private selectedDuplicate: TicketDuplicate | null = null;
   // Candidate IDs explicitly rejected by the operator for the current draft.
   // They are reset as soon as the incident address changes.
@@ -112,6 +116,8 @@ export class TicketStateStore {
       this.verifications = getInitialVerifications(this.result);
       this.forceRegistrationUnlocked = false;
       this.isCallIntercepted = false;
+      this.phoneEditedByOperator = false;
+      this.incidentEditedByOperator = true;
       this.selectedDuplicate = null;
       this.dismissedDuplicateTicketIds.clear();
       this.isSubmitted = false;
@@ -142,6 +148,8 @@ export class TicketStateStore {
     this.verifications = getInitialVerifications(this.result);
     this.forceRegistrationUnlocked = false;
     this.isCallIntercepted = false;
+    this.phoneEditedByOperator = false;
+    this.incidentEditedByOperator = true;
     this.selectedDuplicate = null;
     this.dismissedDuplicateTicketIds.clear();
     this.isSubmitted = false;
@@ -391,6 +399,8 @@ export class TicketStateStore {
       this.verifications = getInitialVerifications(this.result);
       this.forceRegistrationUnlocked = false;
       this.isCallIntercepted = false;
+      this.phoneEditedByOperator = false;
+      this.incidentEditedByOperator = false;
       this.selectedDuplicate = null;
       this.dismissedDuplicateTicketIds.clear();
       this.isSubmitted = false;
@@ -408,6 +418,12 @@ export class TicketStateStore {
   // Setters & Actions
   public updateFormField<K extends keyof WsnTicketData>(field: K, value: WsnTicketData[K], notify: boolean = true): void {
     this.formData[field] = value;
+    if (field === 'phoneNumber') {
+      this.phoneEditedByOperator = true;
+    }
+    if (field === 'incidentDateTime') {
+      this.incidentEditedByOperator = true;
+    }
     if (field === 'addressText') {
       // Coordinates belong to the previous address until Geodata confirms the
       // edited one. Keeping them would create a ticket at the wrong location.
@@ -496,9 +512,43 @@ export class TicketStateStore {
     this.notify();
   }
 
-  public toggleCallIntercept(): void {
-    this.isCallIntercepted = !this.isCallIntercepted;
+  public applyAsteriskCall(call: { id: string; callerNumber: string; startedAt: string }): void {
+    if (this.isSubmitted || !call.id.trim()) {
+      return;
+    }
+    const incidentDateTime = this.formData.incidentDateTime;
+    const merged = mergeAsteriskCallIntoDraft({
+      callId: this.result.callId,
+      phoneNumber: this.formData.phoneNumber,
+      incidentDateTime: typeof incidentDateTime === 'string' ? incidentDateTime : formatDateTimeInput(incidentDateTime),
+      phoneEdited: this.phoneEditedByOperator,
+      incidentEdited: this.incidentEditedByOperator
+    }, call);
+    if (
+      this.result.callId === merged.callId &&
+      this.formData.phoneNumber === merged.phoneNumber &&
+      String(this.formData.incidentDateTime) === merged.incidentDateTime
+    ) {
+      return;
+    }
+    this.result.callId = merged.callId;
+    this.result.ticket.phoneNumber = merged.phoneNumber;
+    this.result.ticket.incidentDateTime = merged.incidentDateTime;
+    this.formData.phoneNumber = merged.phoneNumber;
+    this.formData.incidentDateTime = merged.incidentDateTime;
     this.notify();
+  }
+
+  public setCallIntercepted(intercepted: boolean): void {
+    if (this.isCallIntercepted === intercepted) {
+      return;
+    }
+    this.isCallIntercepted = intercepted;
+    this.notify();
+  }
+
+  public toggleCallIntercept(): void {
+    this.setCallIntercepted(!this.isCallIntercepted);
   }
 
   public setSelectedDuplicate(dup: TicketDuplicate | null): void {
