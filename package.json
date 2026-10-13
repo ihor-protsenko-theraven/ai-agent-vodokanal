@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev:local": "vite",
+    "asterisk:bridge": "node --experimental-strip-types server/asterisk-bridge.mjs",
     "dev:vercel": "npx vercel dev",
     "lint": "eslint .",
     "lint:ci": "eslint . --max-warnings 115",

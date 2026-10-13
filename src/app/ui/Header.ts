@@ -1,4 +1,6 @@
 import { TicketStateStore } from '@/app/state/TicketStateStore';
+import { getAsteriskSession } from '@/features/asterisk/application/AsteriskSession';
+import { asteriskBadgeMarkup } from '@/features/asterisk/ui/asteriskStatus';
 import { MOCK_SCENARIOS } from '@/features/tickets/testing/mock/mockData';
 import { escapeHtml } from '@/shared/utils/security';
 import { aiConfig, appConfig, buildInfo, getBuildBadgeLabel, getBuildDetails, wsnConfig } from '@/shared/config';
@@ -16,7 +18,7 @@ export class HeaderComponent {
     const result = this.store.getResult();
     const activeScenarioId = this.store.getActiveScenarioId();
     const isDemoScenario = this.store.isDemoScenario();
-    const isIntercepted = this.store.getCallIntercepted();
+    const asteriskBadge = asteriskBadgeMarkup(getAsteriskSession().getSnapshot());
     const isPreparingNewTicket = this.store.getIsPreparingNewTicket();
     const unclosedTicketsCount = this.store.getUnclosedTickets().length;
     const isUnclosedTicketsPanelOpen = this.store.getIsUnclosedTicketsPanelOpen();
@@ -78,15 +80,7 @@ export class HeaderComponent {
 
         <!-- Call Metadata & Asterisk Badge -->
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-start xl:justify-center gap-2 sm:gap-3 md:gap-4 bg-slate-950/60 px-3 md:px-4 py-2 rounded-xl border border-slate-800/80 order-3 xl:order-2 w-full xl:w-auto shrink-0 shadow-inner">
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="relative flex h-2.5 w-2.5 shrink-0">
-              <span class="${isIntercepted ? 'bg-amber-400' : 'bg-emerald-400'} animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"></span>
-              <span class="${isIntercepted ? 'bg-amber-500' : 'bg-emerald-500'} relative inline-flex rounded-full h-2.5 w-2.5"></span>
-            </span>
-            <span class="text-[10px] md:text-xs font-medium text-slate-300">
-              ${isIntercepted ? 'Розмова перехоплена' : 'Голосовий потік Asterisk'}
-            </span>
-          </div>
+          ${asteriskBadge}
 
           <div class="h-3 md:h-4 w-[1px] bg-slate-800 shrink-0 hidden sm:block"></div>
 

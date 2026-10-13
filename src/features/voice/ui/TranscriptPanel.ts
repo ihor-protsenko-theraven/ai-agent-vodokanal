@@ -1,4 +1,6 @@
 import { TicketStateStore } from '@/app/state/TicketStateStore';
+import { getAsteriskSession } from '@/features/asterisk/application/AsteriskSession';
+import { applyInterceptButton, interceptButtonView, syncAsteriskSimulator } from '@/features/asterisk/ui/asteriskStatus';
 import { ClarificationMode } from '@/shared/types';
 import { escapeHtml } from '@/shared/utils/security';
 import { appConfig, speechConfig, uiConfig } from '@/shared/config';
@@ -115,6 +117,8 @@ export class TranscriptPanelComponent {
             </button>
           </div>
 
+          <div id="asterisk-simulator" class="hidden"></div>
+
           <!-- Real Audio Processing Controls (Record Mic & Upload File) -->
           <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/80">
             <button id="btn-record-mic" aria-label="Запис з мікрофона" aria-pressed="false" class="py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
@@ -215,26 +219,14 @@ export class TranscriptPanelComponent {
     const isIntercepted = this.store.getCallIntercepted();
     const mode = this.store.getClarificationMode();
     const result = this.store.getResult();
+    const asterisk = getAsteriskSession();
+    applyInterceptButton(this.container, interceptButtonView(asterisk.getSnapshot(), isIntercepted));
+    syncAsteriskSimulator(this.container, asterisk.getSnapshot(), asterisk.getStatusNote());
 
     // 1. Accuracy
     const sttAccuracy = this.container.querySelector('#stt-accuracy-indicator');
     if (sttAccuracy) {
       sttAccuracy.textContent = `STT: ${appConfig.STT_ENGINE} / Точність: ${(result.confidence.speechRecognition * 100).toFixed(0)}%`;
-    }
-
-    // 2. Intercept Button
-    const btnIntercept = this.container.querySelector('#btn-intercept-call');
-    const txtIntercept = this.container.querySelector('#text-intercept-call');
-    if (btnIntercept && txtIntercept) {
-      if (isIntercepted) {
-        btnIntercept.className = 'w-full sm:w-auto px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 bg-amber-600 hover:bg-amber-500 text-white ring-2 ring-amber-400/50';
-        txtIntercept.textContent = 'Повернути AI-агенту';
-        btnIntercept.setAttribute('aria-pressed', 'true');
-      } else {
-        btnIntercept.className = 'w-full sm:w-auto px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-md shrink-0 bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20';
-        txtIntercept.textContent = 'Перехопити розмову';
-        btnIntercept.setAttribute('aria-pressed', 'false');
-      }
     }
 
     // 3. Record Button
@@ -391,8 +383,23 @@ export class TranscriptPanelComponent {
       }
 
       if (target.closest('#btn-intercept-call')) {
-        this.store.toggleCallIntercept();
-        // UI updates automatically via store subscription now
+        const button = target.closest<HTMLButtonElement>('#btn-intercept-call');
+        if (button?.dataset.liveCall === 'true') {
+          void getAsteriskSession().transfer('operator');
+        } else if (!button?.disabled) {
+          this.store.toggleCallIntercept();
+        }
+        return;
+      }
+
+      if (target.closest('#btn-asterisk-sim-call')) {
+        const input = this.container.querySelector<HTMLInputElement>('#asterisk-sim-number');
+        void getAsteriskSession().simulateIncoming(input?.value ?? '');
+        return;
+      }
+
+      if (target.closest('#btn-asterisk-sim-hangup')) {
+        void getAsteriskSession().simulateHangup();
         return;
       }
 

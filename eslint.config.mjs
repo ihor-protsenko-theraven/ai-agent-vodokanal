@@ -73,7 +73,7 @@ export default defineConfig(
     },
   },
   {
-    files: ['api/**/*.js'],
+    files: ['api/**/*.js', 'server/**/*.mjs'],
     extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.node,

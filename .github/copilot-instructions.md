@@ -18,7 +18,8 @@ Prioritise correctness, data loss, privacy/security, and regressions over style.
 
 - Do not put credentials, API keys, or Authorization headers in `VITE_*` variables,
   browser code, logs, errors, tests, or documentation. Secrets belong only in server
-  environment variables and server-side API routes.
+  environment variables and server-side API routes. Asterisk ARI username and password
+  stay in the `server/asterisk-bridge.mjs` process. The browser only sees call state.
 - Never log an entire ticket request/response: it can include the applicant's name,
   address, phone number, and incident details. Logs must be minimal and redacted.
 - Do not weaken CSP, CORS, or proxy validation merely to make an integration work.

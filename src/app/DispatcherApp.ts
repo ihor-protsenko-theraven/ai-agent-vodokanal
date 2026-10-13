@@ -7,6 +7,8 @@ import { SubmissionToastComponent } from '@/features/tickets/ui/SubmissionToast'
 import { UnclosedTicketsPanelComponent } from '@/features/tickets/ui/UnclosedTicketsPanel';
 import { LoginPageComponent } from '@/app/ui/LoginPage';
 import { dropdownDataService } from '@/features/forland/application/DropdownDataService';
+import { getAsteriskSession, installAsteriskSession } from '@/features/asterisk/application/AsteriskSession';
+import { wsnConfig } from '@/shared/config';
 
 export class TicketDispatcherUI {
   private store: TicketStateStore;
@@ -29,6 +31,12 @@ export class TicketDispatcherUI {
     }
     this.rootContainer = el;
     this.store = TicketStateStore.getInstance();
+    installAsteriskSession({
+      applyCall: (call) => this.store.applyAsteriskCall(call),
+      setIntercepted: (value) => this.store.setCallIntercepted(value),
+      readTranscript: () => this.store.getResult().transcript,
+      readOperatorId: () => this.store.getCurrentUser()?.operatorId || wsnConfig.OPERATOR_ID
+    });
   }
 
   public init(): void {
@@ -37,6 +45,12 @@ export class TicketDispatcherUI {
 
     // Subscribe to state store changes
     this.store.subscribe(() => {
+      const session = getAsteriskSession();
+      session.reapplyActiveCall();
+      session.considerTranscript(this.store.getResult().transcript);
+      this.renderAll();
+    });
+    getAsteriskSession().subscribe(() => {
       this.renderAll();
     });
 
@@ -96,6 +110,7 @@ export class TicketDispatcherUI {
   }
 
   private renderAll(): void {
+    this.syncAsteriskSession();
     if (!this.store.isAuthenticated()) {
       if (this.isWorkspaceLayoutBuilt || !document.getElementById('login-root')) {
         this.buildLoginPageLayout();
@@ -114,5 +129,18 @@ export class TicketDispatcherUI {
     this.duplicateModalComponent.render();
     this.unclosedTicketsPanelComponent.render();
     this.submissionToastComponent.render();
+  }
+
+  private syncAsteriskSession(): void {
+    const session = getAsteriskSession();
+    if (this.store.isAuthenticated()) {
+      if (!session.isRunning()) {
+        session.start();
+      }
+      return;
+    }
+    if (session.isRunning()) {
+      session.stop();
+    }
   }
 }

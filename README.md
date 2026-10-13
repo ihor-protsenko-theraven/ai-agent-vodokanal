@@ -29,6 +29,7 @@ tickets, and saves the result to Forland.
 - Strict TypeScript, Vite, DOM API, Tailwind CSS.
 - Vercel Serverless Functions for the Gemini and Forland proxies.
 - Gemini API, Forland API, Geodata.online, OpenStreetMap Nominatim.
+- A persistent Asterisk ARI bridge for caller ID, call id, transfer, and reconnect.
 - Vitest for unit testing.
 
 ## Source layout
@@ -40,14 +41,20 @@ src/
 │   ├── tickets/            # Form, duplicate detection, unclosed-ticket drawer
 │   ├── voice/              # Gemini, local NLP, transcript UI
 │   ├── geocoding/          # Orchestration, Geodata and Nominatim adapters
-│   └── forland/            # API client, dropdowns, Save request mapping
+│   ├── forland/            # API client, dropdowns, Save request mapping
+│   └── asterisk/           # Call state, ARI bridge client, transfer rules
 ├── shared/                 # Configuration, types, and pure utilities
 ├── main.ts                 # Vite entry point
 └── style.css
 
 api/
 ├── gemini.js               # Server-side Gemini proxy
-└── forland.js              # Server-side Forland proxy
+├── forland.js              # Server-side Forland proxy
+└── asterisk.js             # Unavailable snapshot when the persistent bridge is absent
+
+server/
+├── asterisk-bridge.mjs     # Persistent ARI / simulator process
+└── ari-transport.mjs       # ARI REST and events websocket
 ```
 
 Unit tests live next to the module under test: `SomeModule.ts` and
@@ -71,6 +78,25 @@ npm run dev:local
 The app is available at `http://localhost:3000`. This mode uses the Vite
 Forland proxy (`/forland`) and the local parser, so it does not require a
 Gemini key.
+
+Start the Asterisk bridge in a second terminal when call control is needed:
+
+```powershell
+npm run asterisk:bridge
+```
+
+Without ARI credentials this process is a labeled simulator, not a live trunk.
+The header shows `Симулятор Asterisk`. An incoming simulated call fills an
+empty phone field and replaces the draft call id with the bridge id. Transfer
+uses the intercept button. If the bridge is stopped, the header shows
+`Asterisk недоступний` and the operator can still register the ticket by hand.
+
+To attach a PBX, set `ASTERISK_ARI_URL`, `ASTERISK_ARI_USERNAME`,
+`ASTERISK_ARI_PASSWORD`, `ASTERISK_ARI_APP`, and `ASTERISK_OPERATOR_ENDPOINT`
+in the bridge process only. Do not prefix them with `VITE_`. Optional
+`ASTERISK_EXTERNAL_MEDIA_HOST` asks ARI to fork audio to that host; the bridge
+does not store the recording. `ASTERISK_MODE=off` keeps the bridge up but
+leaves call control unavailable.
 
 > There is no `npm run dev` script. Do not use `npx run dev`; the regular local
 > development command is `npm run dev:local`.

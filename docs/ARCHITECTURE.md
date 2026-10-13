@@ -13,7 +13,8 @@ src/
 │   ├── tickets/            # чернетка заявки, дедуплікація, форма та drawer
 │   ├── voice/              # Gemini, локальний розбір транскрипції та voice UI
 │   ├── geocoding/          # оркестрація й адаптери Geodata/Nominatim
-│   └── forland/            # API-клієнт, dropdowns і мапінг Save-запиту
+│   ├── forland/            # API-клієнт, dropdowns і мапінг Save-запиту
+│   └── asterisk/           # стан виклику, міст ARI та передача оператору
 ├── shared/                 # типи, конфігурація та чисті утиліти без UI
 └── main.ts                 # єдина точка входу Vite
 ```
