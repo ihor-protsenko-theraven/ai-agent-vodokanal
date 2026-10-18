@@ -1,6 +1,5 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiService } from '../../core/api.service';
 
 type ContactCategory = 'DOCTOR' | 'TUTOR' | 'SCHOOL' | 'FAMILY' | 'OTHER';
@@ -139,10 +138,10 @@ export class ContactsPage implements OnInit {
   category: ContactCategory = 'DOCTOR';
 
   ngOnInit(): void {
-    this.api
+    const sub = this.api
       .get<ContactItem[]>('/contacts')
-      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((contacts) => this.contacts.set(contacts));
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
   }
 
   categoryLabel(category: ContactCategory): string {

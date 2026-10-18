@@ -1,7 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiService } from '../../core/api.service';
 
 type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
@@ -128,10 +127,10 @@ export class SolomiyaPage implements OnInit {
   private readonly order: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE'];
 
   ngOnInit(): void {
-    this.api
+    const sub = this.api
       .get<TaskItem[]>('/solomiya/tasks')
-      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((tasks) => this.tasks.set(tasks));
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
   }
 
   statusLabel(status: TaskStatus): string {

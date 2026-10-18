@@ -3,28 +3,28 @@
   "version": "0.1.0",
   "private": true,
   "description": "Family hub: calendar, shopping, Solomiya tasks, contacts",
-  "packageManager": "pnpm@10.33.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev:api": "pnpm --filter api start:dev",
-    "dev:web": "pnpm --filter web start",
-    "build": "pnpm --filter @protsenko/shared build && pnpm --filter api build && pnpm --filter web build",
-    "build:api": "pnpm --filter api build",
-    "build:web": "pnpm --filter web build",
-    "typecheck": "pnpm --filter @protsenko/shared build && pnpm --filter api exec tsc --noEmit && pnpm --filter web exec ng build --configuration=development",
-    "lint": "pnpm --filter api lint",
-    "db:generate": "pnpm --filter api exec prisma generate",
-    "db:migrate": "pnpm --filter api exec prisma migrate dev",
-    "db:seed": "pnpm --filter api exec prisma db seed",
-    "test:api": "pnpm --filter api test"
+    "dev:api": "npm run start:dev -w api",
+    "dev:web": "npm run start -w web",
+    "build": "npm run build -w @protsenko/shared && npm run build -w api && npm run build -w web",
+    "build:api": "npm run build -w api",
+    "build:web": "npm run build -w web",
+    "typecheck": "npm run build -w @protsenko/shared && npm exec -w api -- tsc --noEmit && npm exec -w web -- ng build --configuration=development",
+    "lint": "npm run lint -w api",
+    "db:generate": "npm exec -w api -- prisma generate",
+    "db:migrate": "npm exec -w api -- prisma migrate dev",
+    "db:seed": "npm exec -w api -- prisma db seed",
+    "test:api": "npm run test -w api",
+    "postinstall": "node ./scripts/ensure-env.js && npm run db:generate"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "bcrypt",
-      "@prisma/client",
-      "@prisma/engines",
-      "prisma",
-      "esbuild",
-      "@nestjs/core"
-    ]
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "rxjs": "7.8.2"
   }
 }

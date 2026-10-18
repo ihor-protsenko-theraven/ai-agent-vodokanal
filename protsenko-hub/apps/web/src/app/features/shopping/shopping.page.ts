@@ -1,6 +1,5 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiService } from '../../core/api.service';
 
 interface ShoppingItem {
@@ -134,10 +133,10 @@ export class ShoppingPage implements OnInit {
   name = '';
 
   ngOnInit(): void {
-    this.api
+    const sub = this.api
       .get<ShoppingItem[]>('/shopping/items')
-      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((items) => this.items.set(items));
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
   }
 
   create(): void {

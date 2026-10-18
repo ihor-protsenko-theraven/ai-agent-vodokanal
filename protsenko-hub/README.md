@@ -1,6 +1,9 @@
 # protsenkoHub
 
-Сімейний хаб: календар, список покупок, задачі Соломії, контакти лікарів/репетиторів.
+Самодостатній сімейний хаб у **окремій папці** `protsenko-hub/`.
+Усі залежності (`node_modules`, `package-lock.json`) живуть тільки тут — корінь
+`ai-agent-vodokanal` не потрібен для запуску. Цю папку можна перенести в окреме
+репо як root.
 
 ## Стек
 
@@ -8,21 +11,24 @@
 - **apps/api** — NestJS 11 (JWT cookie auth, modular monolith)
 - **packages/shared** — спільні DTO/типи
 - **DB** — Prisma + SQLite локально; для Vercel — Neon Postgres (`DATABASE_URL`)
+- **Package manager** — npm workspaces
 
 ## Швидкий старт
 
+Усі команди — з цієї папки:
+
 ```bash
 cd protsenko-hub
-pnpm install
+npm install
 cp env.example apps/api/.env
 
-# DB
-pnpm --filter api exec prisma migrate dev --name init
-pnpm --filter api exec prisma db seed
+# DB (після install prisma client уже згенеровано через postinstall)
+npm run db:migrate
+npm run db:seed
 
-# API :3001  +  Web :4200
-pnpm dev:api
-pnpm dev:web
+# API :3001  +  Web :4200  (у двох терміналах)
+npm run dev:api
+npm run dev:web
 ```
 
 Демо-логін після seed:
@@ -30,7 +36,22 @@ pnpm dev:web
 - `admin@protsenkohub.local` / `protsenko123`
 - `family@protsenkohub.local` / `protsenko123`
 
-## Структура API
+## Структура
+
+```text
+protsenko-hub/
+├── apps/
+│   ├── api/          # NestJS + Prisma
+│   └── web/          # Angular
+├── packages/
+│   └── shared/       # спільні типи
+├── package.json      # npm workspaces root
+├── package-lock.json
+├── env.example
+└── node_modules/     # власні залежності проєкту
+```
+
+## API
 
 | Метод | Шлях | Опис |
 |-------|------|------|
@@ -42,4 +63,5 @@ pnpm dev:web
 
 ## Перенесення в окреме репо
 
-Ця папка `protsenko-hub/` самодостатня. Можна скопіювати її вміст у новий репозиторій як root.
+Скопіюй **вміст** `protsenko-hub/` у новий репозиторій (як root), зроби
+`npm install` і працюй далі там.

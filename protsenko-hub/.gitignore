@@ -7,5 +7,6 @@ dist
 .DS_Store
 coverage
 .turbo
+.pnpm-store
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal

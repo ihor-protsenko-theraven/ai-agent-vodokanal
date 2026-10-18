@@ -1,8 +1,6 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DestroyRef } from '@angular/core';
 import { ApiService } from '../../core/api.service';
 
 interface EventItem {
@@ -121,14 +119,10 @@ export class CalendarPage implements OnInit {
   startsAt = '';
 
   ngOnInit(): void {
-    this.reload();
-  }
-
-  reload(): void {
-    this.api
-      .get<EventItem[]>('/events')
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((items) => this.events.set(items));
+    const sub = this.api.get<EventItem[]>('/events').subscribe((items) => {
+      this.events.set(items);
+    });
+    this.destroyRef.onDestroy(() => sub.unsubscribe());
   }
 
   create(): void {
