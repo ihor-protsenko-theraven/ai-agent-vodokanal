@@ -1,0 +1,30 @@
+{
+  "name": "protsenko-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Family hub: calendar, shopping, Solomiya tasks, contacts",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w api",
+    "dev:web": "npm run start -w web",
+    "build": "npm run build -w @protsenko/shared && npm run build -w api && npm run build -w web",
+    "build:api": "npm run build -w api",
+    "build:web": "npm run build -w web",
+    "typecheck": "npm run build -w @protsenko/shared && npm exec -w api -- tsc --noEmit && npm exec -w web -- ng build --configuration=development",
+    "lint": "npm run lint -w api",
+    "db:generate": "npm exec -w api -- prisma generate",
+    "db:migrate": "npm exec -w api -- prisma migrate dev",
+    "db:seed": "npm exec -w api -- prisma db seed",
+    "test:api": "npm run test -w api",
+    "postinstall": "node ./scripts/ensure-env.js && npm run db:generate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "rxjs": "7.8.2"
+  }
+}
