@@ -1,0 +1,30 @@
+{
+  "name": "protsenko-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Family hub: calendar, shopping, Solomiya tasks, contacts",
+  "packageManager": "pnpm@10.33.4",
+  "scripts": {
+    "dev:api": "pnpm --filter api start:dev",
+    "dev:web": "pnpm --filter web start",
+    "build": "pnpm --filter @protsenko/shared build && pnpm --filter api build && pnpm --filter web build",
+    "build:api": "pnpm --filter api build",
+    "build:web": "pnpm --filter web build",
+    "typecheck": "pnpm --filter @protsenko/shared build && pnpm --filter api exec tsc --noEmit && pnpm --filter web exec ng build --configuration=development",
+    "lint": "pnpm --filter api lint",
+    "db:generate": "pnpm --filter api exec prisma generate",
+    "db:migrate": "pnpm --filter api exec prisma migrate dev",
+    "db:seed": "pnpm --filter api exec prisma db seed",
+    "test:api": "pnpm --filter api test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "@nestjs/core"
+    ]
+  }
+}

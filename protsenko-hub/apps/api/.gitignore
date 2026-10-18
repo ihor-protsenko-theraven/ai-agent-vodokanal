@@ -1,0 +1,4 @@
+*.tsbuildinfo
+prisma/seed.js
+prisma/seed.d.ts
+prisma/seed.js.map
