@@ -11,6 +11,8 @@ export default defineConfig(
       'coverage/**',
       'node_modules/**',
       'release-please-config.json',
+      // Standalone nested app with its own npm workspaces / eslint config.
+      'protsenko-hub/**',
     ],
   },
   {
